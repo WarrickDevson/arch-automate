@@ -1,0 +1,151 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* ─── Architectural Palette (Light) ─── */
+  --color-bg: 248 250 252; /* Slate 50 */
+  --color-surface: 255 255 255;
+  --color-border: 226 232 240; /* Slate 200 */
+  --color-text: 15 23 42; /* Slate 900 */
+  --color-muted: 100 116 139; /* Slate 500 */
+
+  /* Primary Brand: Deep "Blueprint" Blue */
+  --color-accent: 30 58 138; /* Blue 900 (#1e3a8a) */
+  --color-accent-strong: 23 37 84; /* Blue 950 */
+
+  /* Highlight: Technical Cyan (instead of Lime) */
+  --color-highlight: 14 165 233; /* Sky 500 */
+
+  /* ─── shadcn-vue HSL tokens (Architectural) ─── */
+  --background: 210 40% 98%;
+  --foreground: 222 47% 11%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+
+  /* primary = Deep Navy Engineering Blue */
+  --primary: 222 47% 11%;
+  --primary-foreground: 210 40% 98%;
+
+  --secondary: 210 40% 96%;
+  --secondary-foreground: 222 47% 11%;
+
+  --muted: 210 40% 96%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+
+  --accent: 210 40% 96%;
+  --accent-foreground: 222 47% 11%;
+
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
+
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+  --ring: 221.2 83.2% 53.3%;
+
+  --radius: 0.5rem; /* Sharper corners for a technical feel */
+
+  /* sidebar */
+  --sidebar: 222 47% 11%;
+  --sidebar-foreground: 210 40% 98%;
+  --sidebar-primary: 217 91% 60%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 217 19% 27%;
+  --sidebar-accent-foreground: 210 40% 98%;
+  --sidebar-border: 217 19% 27%;
+  --sidebar-ring: 217 91% 60%;
+}
+
+[data-theme='dark'] {
+  --color-bg: 2 6 23; /* Slate 950 */
+  --color-surface: 15 23 42; /* Slate 900 */
+  --color-border: 30 41 59; /* Slate 800 */
+  --color-text: 241 245 249; /* Slate 100 */
+  --color-muted: 148 163 184; /* Slate 400 */
+  --color-accent: 59 130 246; /* Blue 500 */
+  --color-accent-strong: 37 99 235;
+
+  /* ─── shadcn-vue HSL tokens (Dark Studio) ─── */
+  --background: 222 47% 4%;
+  --foreground: 210 40% 98%;
+  --card: 222 47% 7%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222 47% 7%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 210 40% 98%;
+  --primary-foreground: 222 47% 11.2%;
+  --secondary: 217.2 32.6% 17.5%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 217.2 32.6% 17.5%;
+  --muted-foreground: 215 20.2% 65.1%;
+  --accent: 217.2 32.6% 17.5%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 217.2 32.6% 17.5%;
+  --input: 217.2 32.6% 17.5%;
+  --ring: 212.7 26.8% 83.9%;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  /* Inter for UI, JetBrains Mono for Math/Technical Data */
+  font-family: 'Inter', sans-serif;
+  background:
+    /* Blueprint Radial Gradient */
+    radial-gradient(circle at 10% 10%, rgba(30, 58, 138, 0.08), transparent 40%),
+    radial-gradient(circle at 90% 90%, rgba(14, 165, 233, 0.05), transparent 40%),
+    rgb(var(--color-bg));
+  color: rgb(var(--color-text));
+  line-height: 1.5;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Technical Monospace styling for math results */
+.font-mono {
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: -0.02em;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.2);
+  border-radius: 10px;
+}
+
+@layer components {
+  .page-title {
+    @apply text-2xl font-extrabold leading-tight tracking-tighter text-slate-900 uppercase md:text-3xl;
+  }
+
+  .page-subtitle {
+    @apply mt-1 text-sm font-medium text-slate-500 tracking-tight;
+  }
+
+  .page-action-btn {
+    @apply inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-bold uppercase tracking-widest text-slate-700 shadow-sm transition hover:bg-slate-50 active:scale-95;
+  }
+
+  .page-action-btn-primary {
+    @apply inline-flex items-center gap-2 rounded-lg bg-slate-900 px-5 py-2 text-xs font-bold uppercase tracking-widest text-white shadow-md transition hover:bg-slate-800 active:scale-95;
+  }
+
+  /* Technical Labels for SANS 10400 forms */
+  .tech-label {
+    @apply text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1 block;
+  }
+}

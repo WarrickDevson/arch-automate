@@ -1,0 +1,21 @@
+# Visual Studio
+.vs/
+[Bb]in/
+[Oo]bj/
+*.user
+*.suo
+*.userosscache
+*.sln.doccache
+
+# Node.js
+node_modules/
+dist/
+.env
+*.log
+
+# Supabase
+.supabase/
+
+# OS
+.DS_Store
+Thumbs.db
