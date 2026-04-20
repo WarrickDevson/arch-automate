@@ -28,9 +28,20 @@ builder.Host.UseSerilog((ctx, lc) => lc
 // PostgreSQL / EF Core
 // NpgsqlDataSourceBuilder registers PostgreSQL enum types at the driver level so
 // EF Core can read/write project_status, stakeholder_role etc. as native PG enums.
-var npgsqlDataSourceBuilder = new NpgsqlDataSourceBuilder(
+var defaultConnection =
     builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? throw new InvalidOperationException("DefaultConnection is not configured."));
+    ?? builder.Configuration["ConnectionStrings:DefaultConnection"]
+    ?? Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
+    ?? Environment.GetEnvironmentVariable("DATABASE_URL");
+
+if (string.IsNullOrWhiteSpace(defaultConnection))
+{
+    throw new InvalidOperationException(
+        "Database connection is not configured. Set one of: " +
+        "ConnectionStrings__DefaultConnection or DATABASE_URL.");
+}
+
+var npgsqlDataSourceBuilder = new NpgsqlDataSourceBuilder(defaultConnection);
 // NpgsqlSnakeCaseNameTranslator converts PascalCase members to snake_case so
 // e.g. ProjectStatus.InProgress maps to the PostgreSQL enum value "in_progress".
 var snakeCase = new NpgsqlSnakeCaseNameTranslator();
@@ -44,8 +55,17 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(npgsqlDataSource));
 
 // JWT Authentication — Supabase ECC P-256 tokens validated via JWKS auto-discovery.
-var supabaseUrl = builder.Configuration["Supabase:Url"]
-    ?? throw new InvalidOperationException("Supabase:Url is not configured.");
+var supabaseUrl =
+    builder.Configuration["Supabase:Url"]
+    ?? builder.Configuration["Supabase__Url"]
+    ?? Environment.GetEnvironmentVariable("Supabase__Url")
+    ?? Environment.GetEnvironmentVariable("SUPABASE_URL");
+
+if (string.IsNullOrWhiteSpace(supabaseUrl))
+{
+    throw new InvalidOperationException(
+        "Supabase URL is not configured. Set one of: Supabase__Url or SUPABASE_URL.");
+}
 
 var supabaseAuthBase = $"{supabaseUrl.TrimEnd('/')}/auth/v1";
 
@@ -100,7 +120,11 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowFrontend", policy =>
         policy.WithOrigins(
                 builder.Configuration.GetSection("AllowedOrigins").Get<string[]>()
-                ?? ["http://localhost:5289", "https://localhost:5289"])
+                                ?? [
+                                        "https://arch-automate.netlify.app",
+                                        "http://localhost:5289",
+                                        "https://localhost:5289",
+                                    ])
               .AllowAnyHeader()
               .AllowAnyMethod());
 });
