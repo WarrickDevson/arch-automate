@@ -1,0 +1,14 @@
+**/bin/
+**/obj/
+**/.vs/
+**/*.user
+**/*.suo
+**/*.log
+
+# Keep local secrets out of image layers
+ArchAutomate.Api/appsettings.json
+ArchAutomate.Api/appsettings.Development.json
+
+# Unrelated workspace parts
+../frontend/
+../supabase/
