@@ -1,0 +1,15 @@
+**/.git/
+**/.vs/
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+
+# Secret-bearing local env/config files
+frontend/.env.local
+backend/ArchAutomate.Api/appsettings.Development.json
+backend/ArchAutomate.Api/appsettings.json
+
+# Keep deployment context focused
+frontend/
+supabase/

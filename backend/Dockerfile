@@ -1,17 +1,17 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
-COPY ArchAutomate.sln ./
-COPY ArchAutomate.Api/ArchAutomate.Api.csproj ArchAutomate.Api/
-COPY ArchAutomate.BIM/ArchAutomate.BIM.csproj ArchAutomate.BIM/
-COPY ArchAutomate.CAD/ArchAutomate.CAD.csproj ArchAutomate.CAD/
-COPY ArchAutomate.Data/ArchAutomate.Data.csproj ArchAutomate.Data/
-COPY ArchAutomate.AI/ArchAutomate.AI.csproj ArchAutomate.AI/
+COPY backend/ArchAutomate.sln backend/
+COPY backend/ArchAutomate.Api/ArchAutomate.Api.csproj backend/ArchAutomate.Api/
+COPY backend/ArchAutomate.BIM/ArchAutomate.BIM.csproj backend/ArchAutomate.BIM/
+COPY backend/ArchAutomate.CAD/ArchAutomate.CAD.csproj backend/ArchAutomate.CAD/
+COPY backend/ArchAutomate.Data/ArchAutomate.Data.csproj backend/ArchAutomate.Data/
+COPY backend/ArchAutomate.AI/ArchAutomate.AI.csproj backend/ArchAutomate.AI/
 
-RUN dotnet restore ArchAutomate.Api/ArchAutomate.Api.csproj
+RUN dotnet restore backend/ArchAutomate.Api/ArchAutomate.Api.csproj
 
 COPY . .
-RUN dotnet publish ArchAutomate.Api/ArchAutomate.Api.csproj -c Release -o /app/publish /p:UseAppHost=false
+RUN dotnet publish backend/ArchAutomate.Api/ArchAutomate.Api.csproj -c Release -o /app/publish /p:UseAppHost=false
 
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 WORKDIR /app
