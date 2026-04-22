@@ -21,7 +21,7 @@ defineProps({
       >
         <slot name="icon" />
       </div>
-      <h3 class="font-display text-xl font-semibold text-foreground">{{ title }}</h3>
+      <h3 class="text-xl font-semibold text-foreground">{{ title }}</h3>
       <p class="mx-auto mt-3 max-w-md text-sm -foreground">{{ description }}</p>
     </CardContent>
   </Card>

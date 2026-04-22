@@ -53,7 +53,7 @@ function proceed() {
       <template v-if="step === 'practice'">
         <div class="border-l-4 border-primary pl-6 mb-10">
           <p class="text-[10px] font-bold uppercase tracking-[0.3em] text-primary/60">Welcome</p>
-          <h1 class="mt-2 font-display text-3xl font-extrabold tracking-tighter text-foreground uppercase">
+          <h1 class="mt-2 text-3xl font-extrabold tracking-tighter text-foreground uppercase">
             Set Up Your Workspace
           </h1>
           <p class="mt-2 max-w-md text-[13px] font-medium text-slate-500">

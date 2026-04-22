@@ -104,7 +104,7 @@ onBeforeUnmount(() => {
               Arch Automate SA
             </p>
             <h2
-              class="mt-4 font-display text-4xl font-extrabold uppercase leading-tight tracking-tighter"
+              class="mt-4 text-4xl font-extrabold uppercase leading-tight tracking-tighter"
             >
               Engineering <br />
               Success.

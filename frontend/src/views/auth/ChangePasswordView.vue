@@ -57,7 +57,7 @@ const goBack = async () => {
             Account Security
           </p>
           <h1
-            class="mt-2 font-display text-3xl font-extrabold tracking-tighter text-foreground uppercase"
+            class="mt-2 text-3xl font-extrabold tracking-tighter text-foreground uppercase"
           >
             Change Password
           </h1>
