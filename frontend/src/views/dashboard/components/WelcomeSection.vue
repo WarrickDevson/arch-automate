@@ -203,6 +203,7 @@ watch(allDone, (val) => {
             </span>
             <Button
               v-else-if="step.cta"
+              type="button"
               size="sm"
               variant="outline"
               class="text-[11px] font-bold uppercase tracking-wide border-slate-200 gap-1.5 h-8 px-3 whitespace-nowrap"
