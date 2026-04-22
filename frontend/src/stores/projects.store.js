@@ -62,6 +62,31 @@ export const useProjectsStore = defineStore('projects', () => {
     if (idx !== -1) projects.value[idx].ifcPath = ifcPath
   }
 
+  async function updateProject(id, payload) {
+    const updated = await projectsService.updateProject(id, payload)
+    const idx = projects.value.findIndex((p) => p.id === id)
+    if (idx !== -1) projects.value[idx] = updated
+    return updated
+  }
+
+  async function saveIfcData(id, payload) {
+    await projectsService.saveIfcData(id, payload)
+    const idx = projects.value.findIndex((p) => p.id === id)
+    if (idx !== -1) {
+      const p = projects.value[idx]
+      if (payload.proposedGfaM2 != null) p.proposedGfaM2 = payload.proposedGfaM2
+      if (payload.footprintM2 != null) p.footprintM2 = payload.footprintM2
+      if (payload.buildingHeightM != null) p.buildingHeightM = payload.buildingHeightM
+      if (payload.numberOfStoreys != null) p.numberOfStoreys = payload.numberOfStoreys
+    }
+  }
+
+  async function saveParams(id, payload) {
+    await projectsService.saveParams(id, payload)
+    const idx = projects.value.findIndex((p) => p.id === id)
+    if (idx !== -1) Object.assign(projects.value[idx], payload)
+  }
+
   return {
     projects,
     loading,
@@ -73,5 +98,8 @@ export const useProjectsStore = defineStore('projects', () => {
     addProject,
     removeProject,
     updateIfcPath,
+    updateProject,
+    saveIfcData,
+    saveParams,
   }
 })

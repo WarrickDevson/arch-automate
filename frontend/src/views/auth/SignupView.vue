@@ -67,6 +67,11 @@ const onRegister = async () => {
       return
     }
 
+    if (result.status === 'onboarding-required') {
+      await router.replace({ name: 'onboarding' })
+      return
+    }
+
     await router.replace({
       path: '/auth/verify-account',
       query: { username: normalizedEmail.value },
@@ -202,12 +207,21 @@ const onRegister = async () => {
 
 <style scoped>
 :deep(label) {
-  @apply text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgb(148 163 184);
+  margin-bottom: 0.375rem;
 }
 :deep(input) {
-  @apply rounded-lg border-slate-200 focus:ring-blue-900/10 focus:border-blue-900 transition-all;
+  border-radius: 0.5rem;
+  border-color: rgb(226 232 240);
+  transition: all 150ms ease;
 }
 :deep(.text-xs.text-muted-foreground) {
-  @apply font-mono text-[11px] text-slate-400;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 11px;
+  color: rgb(148 163 184);
 }
 </style>

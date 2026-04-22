@@ -8,12 +8,19 @@ namespace ArchAutomate.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/[controller]")]
-public class CouncilPackController(CouncilTableGenerator generator) : ControllerBase
+public class CouncilPackController : ControllerBase
 {
+    private readonly CouncilTableGenerator _generator;
+
+    public CouncilPackController(CouncilTableGenerator generator)
+    {
+        _generator = generator;
+    }
+
     [HttpPost("generate-tables")]
     public IActionResult GenerateTables([FromBody] CouncilTableData data)
     {
-        byte[] dxfBytes = generator.Generate(data);
+        byte[] dxfBytes = _generator.Generate(data);
 
         string fileName = $"CouncilTables_{data.DrawingNumber}_{data.Revision}.dxf";
         return File(dxfBytes, "application/dxf", fileName);

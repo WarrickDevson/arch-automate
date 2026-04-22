@@ -18,7 +18,7 @@ namespace ArchAutomate.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.13")
+                .HasAnnotation("ProductVersion", "8.0.11")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "public", "project_status", new[] { "draft", "in_progress", "submitted_to_council", "approved", "rejected", "revised" });
@@ -27,12 +27,63 @@ namespace ArchAutomate.Data.Migrations
             NpgsqlModelBuilderExtensions.HasPostgresEnum(modelBuilder, "public", "stakeholder_role", new[] { "architect", "client", "structural_engineer", "electrical_engineer", "plumbing_engineer", "quantity_surveyor", "council_officer", "contractor", "other" });
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("ArchAutomate.Data.Entities.Municipality", b =>
+                {
+                    b.Property<short>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("smallint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<short>("Id"));
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("category");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
+                    b.Property<short>("ProvinceId")
+                        .HasColumnType("smallint")
+                        .HasColumnName("province_id");
+
+                    b.Property<string>("ShortName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("short_name");
+
+                    b.Property<string>("ZoningScheme")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("zoning_scheme");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("municipalities", (string)null);
+                });
+
             modelBuilder.Entity("ArchAutomate.Data.Entities.Project", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
+
+                    b.Property<string>("Address")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("address");
+
+                    b.Property<double>("BuildingHeightM")
+                        .HasColumnType("double precision")
+                        .HasColumnName("building_height_m");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -48,13 +99,30 @@ namespace ArchAutomate.Data.Migrations
                         .HasColumnType("text")
                         .HasColumnName("erf");
 
+                    b.Property<double>("FootprintM2")
+                        .HasColumnType("double precision")
+                        .HasColumnName("footprint_m2");
+
+                    b.Property<double>("FrontSetbackM")
+                        .HasColumnType("double precision")
+                        .HasColumnName("front_setback_m");
+
+                    b.Property<double>("GlaForParkingM2")
+                        .HasColumnType("double precision")
+                        .HasColumnName("gla_for_parking_m2");
+
                     b.Property<string>("IfcPath")
-                        .HasColumnType("text");
+                        .HasColumnType("text")
+                        .HasColumnName("ifc_path");
 
                     b.Property<string>("Municipality")
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("municipality_name");
+
+                    b.Property<short?>("MunicipalityId")
+                        .HasColumnType("smallint")
+                        .HasColumnName("municipality_id");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -62,9 +130,29 @@ namespace ArchAutomate.Data.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
 
+                    b.Property<int>("NumberOfStoreys")
+                        .HasColumnType("integer")
+                        .HasColumnName("number_of_storeys");
+
                     b.Property<Guid>("OwnerUserId")
                         .HasColumnType("uuid")
                         .HasColumnName("owner_user_id");
+
+                    b.Property<int>("ParkingBays")
+                        .HasColumnType("integer")
+                        .HasColumnName("parking_bays");
+
+                    b.Property<double>("ProposedGfaM2")
+                        .HasColumnType("double precision")
+                        .HasColumnName("proposed_gfa_m2");
+
+                    b.Property<double>("RearSetbackM")
+                        .HasColumnType("double precision")
+                        .HasColumnName("rear_setback_m");
+
+                    b.Property<double>("SideSetbackM")
+                        .HasColumnType("double precision")
+                        .HasColumnName("side_setback_m");
 
                     b.Property<double>("SiteAreaM2")
                         .HasColumnType("double precision")
@@ -94,6 +182,53 @@ namespace ArchAutomate.Data.Migrations
                     b.HasIndex("TenantId");
 
                     b.ToTable("projects", (string)null);
+                });
+
+            modelBuilder.Entity("ArchAutomate.Data.Entities.ProjectSchedule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("DoorCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("door_count");
+
+                    b.Property<string>("DoorScheduleJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("door_schedule");
+
+                    b.Property<DateTime>("ExtractedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("extracted_at");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<int>("WindowCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("window_count");
+
+                    b.Property<string>("WindowScheduleJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("window_schedule");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("project_schedules", (string)null);
                 });
 
             modelBuilder.Entity("ArchAutomate.Data.Entities.RejectionComment", b =>
@@ -194,6 +329,17 @@ namespace ArchAutomate.Data.Migrations
                     b.HasIndex("ProjectId");
 
                     b.ToTable("stakeholders", (string)null);
+                });
+
+            modelBuilder.Entity("ArchAutomate.Data.Entities.ProjectSchedule", b =>
+                {
+                    b.HasOne("ArchAutomate.Data.Entities.Project", "Project")
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Project");
                 });
 
             modelBuilder.Entity("ArchAutomate.Data.Entities.RejectionComment", b =>

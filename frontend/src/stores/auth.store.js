@@ -196,8 +196,16 @@ export const useAuthStore = defineStore(
 
         session.value = data.session
         user.value = data.user
-        profileLoaded.value = true
-        return { status: 'confirmed' }
+        // A confirmed auth session does not guarantee onboarding/profile is complete.
+        // Always hydrate profile/tenant state before deciding where to route next.
+        profileLoaded.value = false
+        profile.value = null
+        needsOnboarding.value = false
+        await bootstrapProfile()
+
+        return {
+          status: needsOnboarding.value ? 'onboarding-required' : 'confirmed',
+        }
       } catch (err) {
         errorMessage.value = err.message
         throw err

@@ -1,8 +1,8 @@
 <script setup>
-import { reactive, ref } from 'vue'
+import { reactive, ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { Loader2 } from 'lucide-vue-next'
+import { Loader2, ChevronsUpDown, Check } from 'lucide-vue-next'
 import {
   Sheet,
   SheetContent,
@@ -22,7 +22,18 @@ import {
   SelectContent,
   SelectItem,
 } from '@/components/ui/select'
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
+import {
+  Command,
+  CommandInput,
+  CommandList,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+  CommandSeparator,
+} from '@/components/ui/command'
 import { useProjectsStore } from '@/stores/projects.store'
+import { useMunicipalitiesStore } from '@/stores/municipalities.store'
 
 // These match the 7 hardcoded schemes in ZoningEngine.cs
 const ZONING_SCHEMES = [
@@ -41,13 +52,44 @@ const props = defineProps({
 const emit = defineEmits(['update:open'])
 
 const projectsStore = useProjectsStore()
+const municipalitiesStore = useMunicipalitiesStore()
 const router = useRouter()
 const submitting = ref(false)
+const muniOpen = ref(false)
+const muniSearch = ref('')
+
+onMounted(() => municipalitiesStore.fetchMunicipalities())
+
+const groupedMunicipalities = computed(() => {
+  const q = muniSearch.value.toLowerCase()
+  const list = q
+    ? municipalitiesStore.municipalities.filter(
+        (m) => m.name.toLowerCase().includes(q) || m.shortName.toLowerCase().includes(q),
+      )
+    : municipalitiesStore.municipalities
+
+  // Group by provinceName, preserving insertion order (municipalities are sorted by name)
+  const map = new Map()
+  for (const m of list) {
+    const key = m.provinceName || 'Other'
+    if (!map.has(key)) map.set(key, [])
+    map.get(key).push(m)
+  }
+  return Array.from(map, ([province, items]) => ({ province, items }))
+})
+
+function selectMunicipality(name) {
+  form.municipality = name
+  muniOpen.value = false
+  muniSearch.value = ''
+  if (errors.municipality) delete errors.municipality
+}
 
 const EMPTY_FORM = {
   name: '',
   description: '',
   municipality: '',
+  address: '',
   erf: '',
   siteAreaM2: '',
   zoningScheme: '',
@@ -76,6 +118,7 @@ async function submit() {
       name: form.name.trim(),
       description: form.description.trim(),
       municipality: form.municipality.trim(),
+      address: form.address.trim(),
       erf: form.erf.trim(),
       siteAreaM2: Number(form.siteAreaM2),
       zoningScheme: form.zoningScheme,
@@ -138,15 +181,55 @@ function cancel() {
 
         <!-- Municipality -->
         <div class="space-y-1.5">
-          <Label for="proj-muni" class="text-xs font-bold uppercase tracking-wide">
+          <Label class="text-xs font-bold uppercase tracking-wide">
             Municipality <span class="text-rose-500">*</span>
           </Label>
-          <Input
-            id="proj-muni"
-            v-model="form.municipality"
-            placeholder="e.g. City of Johannesburg"
-            :class="errors.municipality ? 'border-rose-400 focus-visible:ring-rose-400' : ''"
-          />
+          <Popover v-model:open="muniOpen">
+            <PopoverTrigger as-child>
+              <Button
+                variant="outline"
+                role="combobox"
+                :aria-expanded="muniOpen"
+                class="w-full justify-between font-normal"
+                :class="errors.municipality ? 'border-rose-400 focus:ring-rose-400' : ''"
+              >
+                <span :class="!form.municipality ? 'text-slate-400' : ''">
+                  {{ form.municipality || 'Search municipality…' }}
+                </span>
+                <ChevronsUpDown class="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent class="w-[--radix-popover-trigger-width] p-0" align="start">
+              <Command should-filter="false">
+                <CommandInput
+                  v-model="muniSearch"
+                  placeholder="Search municipalities…"
+                />
+                <CommandList>
+                  <CommandEmpty>
+                    {{ municipalitiesStore.loading ? 'Loading…' : 'No municipality found.' }}
+                  </CommandEmpty>
+                  <template v-for="(group, gi) in groupedMunicipalities" :key="group.province">
+                    <CommandSeparator v-if="gi > 0" />
+                    <CommandGroup :heading="group.province">
+                      <CommandItem
+                        v-for="m in group.items"
+                        :key="m.id"
+                        :value="m.name"
+                        @select="selectMunicipality(m.name)"
+                      >
+                        <Check
+                          class="mr-2 h-4 w-4"
+                          :class="form.municipality === m.name ? 'opacity-100' : 'opacity-0'"
+                        />
+                        {{ m.name }}
+                      </CommandItem>
+                    </CommandGroup>
+                  </template>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
           <p v-if="errors.municipality" class="text-[11px] text-rose-500">
             {{ errors.municipality }}
           </p>
@@ -181,6 +264,16 @@ function cancel() {
             :class="errors.siteAreaM2 ? 'border-rose-400 focus-visible:ring-rose-400' : ''"
           />
           <p v-if="errors.siteAreaM2" class="text-[11px] text-rose-500">{{ errors.siteAreaM2 }}</p>
+        </div>
+
+        <!-- Address -->
+        <div class="space-y-1.5">
+          <Label for="proj-addr" class="text-xs font-bold uppercase tracking-wide">Address</Label>
+          <Input
+            id="proj-addr"
+            v-model="form.address"
+            placeholder="e.g. 1 Main Street, Sandton"
+          />
         </div>
 
         <!-- Zoning Scheme -->

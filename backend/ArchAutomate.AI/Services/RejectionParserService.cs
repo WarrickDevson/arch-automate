@@ -10,12 +10,19 @@ namespace ArchAutomate.AI.Services;
 /// Uses Google Vertex AI Gemini to parse raw council rejection letter text
 /// into structured <see cref="RejectionItem"/> records.
 /// </summary>
-public class RejectionParserService(IConfiguration configuration)
+public class RejectionParserService
 {
-    private readonly string _projectId = configuration["Vertex:ProjectId"]
-        ?? throw new InvalidOperationException("Vertex:ProjectId is not configured.");
-    private readonly string _location = configuration["Vertex:Location"] ?? "us-central1";
-    private readonly string _model = configuration["Vertex:Model"] ?? "gemini-1.5-pro-002";
+    private readonly string _projectId;
+    private readonly string _location;
+    private readonly string _model;
+
+    public RejectionParserService(IConfiguration configuration)
+    {
+        _projectId = configuration["Vertex:ProjectId"]
+            ?? throw new InvalidOperationException("Vertex:ProjectId is not configured.");
+        _location = configuration["Vertex:Location"] ?? "us-central1";
+        _model = configuration["Vertex:Model"] ?? "gemini-1.5-pro-002";
+    }
 
     private const string SystemPrompt = """
         You are an expert South African building compliance assistant.

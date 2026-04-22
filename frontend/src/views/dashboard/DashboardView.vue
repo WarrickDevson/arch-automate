@@ -6,7 +6,6 @@ import {
   AlertOctagon,
   Clock,
   BarChart3,
-  Download,
   Plus,
   SlidersHorizontal,
   ChevronDown,
@@ -16,6 +15,7 @@ import {
   Search,
   Loader2,
   ExternalLink,
+  Pencil,
 } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { useRouter } from 'vue-router'
@@ -25,6 +25,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import AppDatePicker from '@/components/ui/AppDatePicker.vue'
 import WelcomeSection from './components/WelcomeSection.vue'
+import EditProjectSheet from './components/EditProjectSheet.vue'
 import { useProjectsStore } from '@/stores/projects.store'
 import { useUiStore } from '@/stores/ui.store'
 
@@ -36,6 +37,7 @@ const router = useRouter()
 // --- STATE ---
 const searchQuery = ref('')
 const deletingId = ref(null)
+const editingProject = ref(null)
 
 // Filter State
 const startDate = ref('')
@@ -71,6 +73,14 @@ onMounted(() => projectsStore.fetchProjects())
 // --- COMPUTED ---
 const activeFilterCount = computed(
   () => filters.municipalities.length + filters.status.length,
+)
+
+const showInitialTableLoading = computed(
+  () => projectsStore.loading && projectsStore.projects.length === 0,
+)
+
+const isRefreshingTableData = computed(
+  () => projectsStore.loading && projectsStore.projects.length > 0,
 )
 
 const filteredProjects = computed(() => {
@@ -136,7 +146,7 @@ const clearFilters = () => {
 }
 
 async function handleDelete(project) {
-  if (!confirm(`Delete "${project.name}"? This cannot be undone.`)) return
+  if (!window.confirm(`Delete "${project.name}"? This cannot be undone.`)) return
   deletingId.value = project.id
   try {
     await projectsStore.removeProject(project.id)
@@ -150,27 +160,7 @@ async function handleDelete(project) {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <!-- Page Header -->
-    <header class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-      <div>
-        <h1 class="text-2xl font-bold tracking-tight text-slate-900 uppercase">Command Center</h1>
-        <p class="text-sm text-slate-500">Portfolio Operations & Municipal Compliance Dashboard</p>
-      </div>
-
-      <div class="flex flex-wrap items-center gap-2">
-        <Button variant="outline" class="gap-2 uppercase text-xs font-bold" disabled>
-          <Download class="h-3.5 w-3.5" /> Export Report
-        </Button>
-        <Button
-          class="bg-blue-600 hover:bg-blue-700 gap-2 uppercase text-xs font-bold"
-          @click="uiStore.openCreateProjectSheet()"
-        >
-          <Plus class="h-3.5 w-3.5" /> New Project
-        </Button>
-      </div>
-    </header>
-
+  <div class="view-page">
     <!-- Content Area Placeholder -->
     <div class="grid grid-cols-1 gap-6">
       <!-- Getting Started -->
@@ -392,6 +382,12 @@ async function handleDelete(project) {
                 <BarChart3 class="h-4 w-4 text-blue-600" /> Project Portfolio
               </h3>
               <div class="flex gap-2">
+                <div
+                  v-if="isRefreshingTableData"
+                  class="h-8 px-2 rounded-md border border-slate-200 bg-white flex items-center gap-1.5 text-[11px] text-slate-500"
+                >
+                  <Loader2 class="h-3.5 w-3.5 animate-spin" /> Refreshing...
+                </div>
                 <div class="relative">
                   <Search
                     class="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400"
@@ -437,7 +433,7 @@ async function handleDelete(project) {
                 </thead>
                 <tbody class="divide-y divide-slate-50">
                   <!-- Loading skeleton -->
-                  <template v-if="projectsStore.loading">
+                  <template v-if="showInitialTableLoading">
                     <tr v-for="n in 4" :key="'sk-' + n" class="animate-pulse">
                       <td class="px-6 py-4"><div class="h-3 bg-slate-100 rounded w-40"></div></td>
                       <td class="px-6 py-4"><div class="h-3 bg-slate-100 rounded w-28"></div></td>
@@ -500,6 +496,15 @@ async function handleDelete(project) {
                         <Button
                           variant="ghost"
                           size="sm"
+                          class="text-slate-400 hover:text-slate-700 hover:bg-slate-100 h-7 w-7 p-0"
+                          title="Edit project"
+                          @click="editingProject = p"
+                        >
+                          <Pencil class="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           class="text-slate-400 hover:text-blue-600 hover:bg-blue-50 h-7 w-7 p-0"
                           title="Open in Workbench"
                           @click="router.push({ name: 'workbench', params: { projectId: p.id } })"
@@ -528,5 +533,10 @@ async function handleDelete(project) {
     </div>
 
     <!-- Create Project Drawer is rendered globally in AppLayout -->
+    <EditProjectSheet
+      :open="!!editingProject"
+      :project="editingProject"
+      @update:open="editingProject = null"
+    />
   </div>
 </template>

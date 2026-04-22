@@ -1,6 +1,7 @@
 using ArchAutomate.AI.Services;
 using ArchAutomate.Data;
 using ArchAutomate.Data.Entities;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -10,11 +11,22 @@ namespace ArchAutomate.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/[controller]")]
-public class RejectionsController(
-    PdfOcrService ocrService,
-    RejectionParserService parserService,
-    AppDbContext db) : ControllerBase
+public class RejectionsController : ControllerBase
 {
+    private readonly PdfOcrService _ocrService;
+    private readonly RejectionParserService _parserService;
+    private readonly AppDbContext _db;
+
+    public RejectionsController(
+        PdfOcrService ocrService,
+        RejectionParserService parserService,
+        AppDbContext db)
+    {
+        _ocrService = ocrService;
+        _parserService = parserService;
+        _db = db;
+    }
+
     /// <summary>Upload a PDF rejection letter and parse it with AI.</summary>
     [HttpPost("parse")]
     [RequestSizeLimit(20 * 1024 * 1024)] // 20 MB
@@ -30,8 +42,8 @@ public class RejectionsController(
         await file.CopyToAsync(ms, ct);
         byte[] pdfBytes = ms.ToArray();
 
-        string rawText = ocrService.ExtractText(pdfBytes);
-        var parsed = await parserService.ParseAsync(rawText, file.FileName, ct);
+        string rawText = _ocrService.ExtractText(pdfBytes);
+        var parsed = await _parserService.ParseAsync(rawText, file.FileName, ct);
 
         return Ok(parsed);
     }
@@ -43,8 +55,8 @@ public class RejectionsController(
         [FromBody] List<SaveRejectionRequest> requests,
         CancellationToken ct)
     {
-        var tenantId = GetTenantId();
-        bool projectExists = await db.Projects
+        var tenantId = await GetTenantIdAsync(ct);
+        bool projectExists = await _db.Projects
             .AnyAsync(p => p.Id == projectId && p.TenantId == tenantId, ct);
 
         if (!projectExists) return NotFound("Project not found.");
@@ -60,8 +72,8 @@ public class RejectionsController(
                 ? cat : RejectionCategory.Other
         }).ToList();
 
-        db.RejectionComments.AddRange(entities);
-        await db.SaveChangesAsync(ct);
+        _db.RejectionComments.AddRange(entities);
+        await _db.SaveChangesAsync(ct);
 
         return Ok(new { saved = entities.Count });
     }
@@ -69,13 +81,13 @@ public class RejectionsController(
     [HttpGet("projects/{projectId:guid}/rejections")]
     public async Task<IActionResult> GetRejections(Guid projectId, CancellationToken ct)
     {
-        var tenantId = GetTenantId();
-        bool projectExists = await db.Projects
+        var tenantId = await GetTenantIdAsync(ct);
+        bool projectExists = await _db.Projects
             .AnyAsync(p => p.Id == projectId && p.TenantId == tenantId, ct);
 
         if (!projectExists) return NotFound("Project not found.");
 
-        var rejections = await db.RejectionComments
+        var rejections = await _db.RejectionComments
             .Where(r => r.ProjectId == projectId)
             .OrderBy(r => r.ReceivedAt)
             .ToListAsync(ct);
@@ -89,8 +101,8 @@ public class RejectionsController(
         [FromBody] UpdateRejectionStatusRequest request,
         CancellationToken ct)
     {
-        var tenantId = GetTenantId();
-        var rejection = await db.RejectionComments
+        var tenantId = await GetTenantIdAsync(ct);
+        var rejection = await _db.RejectionComments
             .Include(r => r.Project)
             .FirstOrDefaultAsync(r => r.Id == rejectionId
                 && r.ProjectId == projectId
@@ -102,17 +114,39 @@ public class RejectionsController(
         if (request.Status == RejectionStatus.Resolved)
             rejection.ResolvedAt = DateTime.UtcNow;
 
-        await db.SaveChangesAsync(ct);
+        await _db.SaveChangesAsync(ct);
         return Ok(rejection);
     }
 
-    private Guid GetTenantId()
+    private async Task<Guid> GetTenantIdAsync(CancellationToken ct)
     {
-        var raw = User.FindFirst("tenant_id")?.Value
-            ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
-            ?? User.FindFirst("sub")?.Value
+        var raw = User.FindFirstValue("tenant_id")
+            ?? User.FindFirstValue("tenantId")
+            ?? User.FindFirstValue("https://arch-automate.app/tenant_id");
+
+        if (!string.IsNullOrWhiteSpace(raw) && Guid.TryParse(raw, out var fromClaim))
+            return fromClaim;
+
+        var userId = GetUserId();
+        var tenantId = await _db.Database
+            .SqlQuery<Guid>($"SELECT tenant_id AS \"Value\" FROM public.profiles WHERE id = {userId} LIMIT 1")
+            .FirstOrDefaultAsync(ct);
+
+        if (tenantId == Guid.Empty)
+            throw new UnauthorizedAccessException("No tenant found for this user.");
+
+        return tenantId;
+    }
+
+    private Guid GetUserId()
+    {
+        var raw = User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? User.FindFirstValue("sub")
             ?? throw new UnauthorizedAccessException("sub claim missing.");
-        return Guid.TryParse(raw, out var id) ? id : throw new UnauthorizedAccessException("Cannot resolve tenant_id as GUID.");
+
+        return Guid.TryParse(raw, out var id)
+            ? id
+            : throw new UnauthorizedAccessException("sub claim is not a valid GUID.");
     }
 }
 

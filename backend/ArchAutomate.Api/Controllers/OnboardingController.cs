@@ -9,8 +9,15 @@ namespace ArchAutomate.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/[controller]")]
-public class OnboardingController(AppDbContext db) : ControllerBase
+public class OnboardingController : ControllerBase
 {
+    private readonly AppDbContext _db;
+
+    public OnboardingController(AppDbContext db)
+    {
+        _db = db;
+    }
+
     /// <summary>
     /// Called once per new user immediately after email confirmation.
     /// Creates the tenant and links the user's profile to it.
@@ -27,7 +34,7 @@ public class OnboardingController(AppDbContext db) : ControllerBase
 
         // ── Idempotency guard ────────────────────────────────────────────
         // EF Core SqlQuery<scalar> requires the column to be aliased as "Value"
-        var existingTenantId = await db.Database
+        var existingTenantId = await _db.Database
             .SqlQuery<Guid>($"SELECT tenant_id AS \"Value\" FROM public.profiles WHERE id = {userId} LIMIT 1")
             .FirstOrDefaultAsync(ct);
 
@@ -39,7 +46,7 @@ public class OnboardingController(AppDbContext db) : ControllerBase
         var slug = GenerateSlug(request.PracticeName.Trim(), tenantId);
         var practiceName = request.PracticeName.Trim();
 
-        await db.Database.ExecuteSqlAsync(
+        await _db.Database.ExecuteSqlAsync(
             $"INSERT INTO public.tenants (id, name, slug, plan) VALUES ({tenantId}, {practiceName}, {slug}, 'free')",
             ct);
 
@@ -49,7 +56,7 @@ public class OnboardingController(AppDbContext db) : ControllerBase
             : request.DisplayName.Trim();
         var email = GetClaimValue("email") ?? string.Empty;
 
-        await db.Database.ExecuteSqlAsync(
+        await _db.Database.ExecuteSqlAsync(
             $"INSERT INTO public.profiles (id, tenant_id, display_name, email, role) VALUES ({userId}, {tenantId}, {displayName}, {email}, 'owner')",
             ct);
 
@@ -65,7 +72,7 @@ public class OnboardingController(AppDbContext db) : ControllerBase
     {
         var userId = GetUserId();
 
-        var existingTenantId = await db.Database
+        var existingTenantId = await _db.Database
             .SqlQuery<Guid>($"SELECT tenant_id AS \"Value\" FROM public.profiles WHERE id = {userId} LIMIT 1")
             .FirstOrDefaultAsync(ct);
 

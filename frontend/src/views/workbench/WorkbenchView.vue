@@ -3,15 +3,20 @@ import { ref, reactive, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Viewer3D from './components/Viewer3D.vue'
 import AnalysisSidebar from './components/AnalysisSidebar.vue'
-import { Play, FileDown, ChevronLeft, Upload, Loader2, FolderOpen, Search, Building2, ArrowRight } from 'lucide-vue-next'
+import { FileDown, Upload, Loader2, FolderOpen, Search, Building2, ArrowRight } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { useProjectsStore } from '@/stores/projects.store'
 import { useUiStore } from '@/stores/ui.store'
 import { useAuthStore } from '@/stores/auth.store'
+import { useMunicipalitiesStore } from '@/stores/municipalities.store'
+import { useSchedulesStore } from '@/stores/schedules.store'
+import { useTallyStore } from '@/stores/tally.store'
+import { useSpecStore } from '@/stores/spec.store'
 import { complianceService } from '@/services/complianceService'
 import { councilPackService } from '@/services/councilPackService'
+import { showPrompt } from '@/services/promptService'
 import { toast } from 'vue-sonner'
 
 const props = defineProps({ projectId: { type: String, default: null } })
@@ -20,15 +25,28 @@ const router = useRouter()
 const projectsStore = useProjectsStore()
 const uiStore = useUiStore()
 const authStore = useAuthStore()
+const municipalitiesStore = useMunicipalitiesStore()
+const schedulesStore = useSchedulesStore()
+const tallyStore = useTallyStore()
+const specStore = useSpecStore()
 
 const viewer3DRef = ref(null)
-const analysisSidebarRef = ref(null)
 const isAnalyzing = ref(false)
 const isLoadingProject = ref(false)
 const complianceResult = ref(null)
+const energyResult = ref(null)
 const ifcStats = ref(null)
 const ifcDimensions = ref(null)
 const ifcAreaSchedule = ref([])
+const ifcGlazingUValue = ref(null)  // extracted from IFC window attributes
+const selectedIfcElement = ref(null)
+const measurementResult = ref(null)
+const ifcLoadProgress = reactive({
+  active: false,
+  label: '',
+  percent: 0,
+  source: 'manual',
+})
 
 // Project picker (shown when no projectId in route)
 const pickerSearch = ref('')
@@ -52,6 +70,18 @@ const projectData = reactive({
   fileSize: '0 MB',
   hasModel: false,
   ifcPath: null,
+  municipalityId: null,
+  province: '',
+  // Persisted analysis params (loaded from project, saved back on analysis)
+  proposedGfaM2: null,
+  footprintM2: null,
+  numberOfStoreys: null,
+  buildingHeightM: null,
+  frontSetbackM: null,
+  rearSetbackM: null,
+  sideSetbackM: null,
+  parkingBays: null,
+  glaForParkingM2: null,
 })
 
 const complianceScore = computed(() => {
@@ -67,6 +97,26 @@ const scoreColorClass = computed(() => {
   if (complianceScore.value >= 60) return 'text-amber-500'
   return 'text-rose-600'
 })
+
+const passRateLabel = computed(() => {
+  if (complianceScore.value === null) return 'Pass Rate: --'
+  return `Pass Rate: ${complianceScore.value}%`
+})
+
+const isManualIfcProgress = computed(
+  () => ifcLoadProgress.active && ifcLoadProgress.source === 'manual',
+)
+
+const showWorkbenchRestoreSkeleton = computed(() => {
+  if (projectData.hasModel) return false
+  if (ifcLoadProgress.active && ifcLoadProgress.source === 'restore') return true
+  if (projectData.ifcPath) return true
+  return Boolean(props.projectId && isLoadingProject.value)
+})
+
+const showWorkbenchEmptyState = computed(
+  () => !projectData.hasModel && !showWorkbenchRestoreSkeleton.value,
+)
 
 // Watches projectId (optional param on same route) — fires on mount AND when
 // the user picks a project from the inline picker, since the component is
@@ -85,6 +135,9 @@ watch(
 
     isLoadingProject.value = true
     try {
+      // Ensure municipality list is loaded so we can resolve province
+      municipalitiesStore.fetchMunicipalities()
+
       const project = await projectsStore.fetchProject(id)
       projectData.id = project.id
       projectData.name = project.name
@@ -93,6 +146,27 @@ watch(
       projectData.siteAreaM2 = project.siteAreaM2
       projectData.erf = project.erf
       projectData.ifcPath = project.ifcPath ?? null
+      projectData.municipalityId = project.municipalityId ?? null
+      projectData.proposedGfaM2 = project.proposedGfaM2 ?? null
+      projectData.footprintM2 = project.footprintM2 ?? null
+      projectData.numberOfStoreys = project.numberOfStoreys ?? null
+      projectData.buildingHeightM = project.buildingHeightM ?? null
+      projectData.frontSetbackM = project.frontSetbackM ?? null
+      projectData.rearSetbackM = project.rearSetbackM ?? null
+      projectData.sideSetbackM = project.sideSetbackM ?? null
+      projectData.parkingBays = project.parkingBays ?? null
+      projectData.glaForParkingM2 = project.glaForParkingM2 ?? null
+
+      // Restore last analysis results from session cache (survives navigation, not hard refresh)
+      try {
+        const cached = window.sessionStorage.getItem(`compliance_${project.id}`)
+        const cachedEnergy = window.sessionStorage.getItem(`energy_${project.id}`)
+        if (cached) complianceResult.value = JSON.parse(cached)
+        if (cachedEnergy) energyResult.value = JSON.parse(cachedEnergy)
+      } catch { /* corrupted cache */ }
+
+      // Resolve province from municipality store (may be async — watch municipalityId below)
+      projectData.province = municipalitiesStore.getProvinceByMunicipalityId(project.municipalityId)
       uiStore.setLastProject(project.id, project.name)
       uiStore.markWorkbenchOpened()
     } catch (err) {
@@ -102,6 +176,16 @@ watch(
     }
   },
   { immediate: true },
+)
+
+// Back-fill province once municipalities have finished loading asynchronously
+watch(
+  () => municipalitiesStore.loaded,
+  (loaded) => {
+    if (loaded && projectData.municipalityId && !projectData.province) {
+      projectData.province = municipalitiesStore.getProvinceByMunicipalityId(projectData.municipalityId)
+    }
+  },
 )
 
 function handleIfcLoaded({ fileSize }) {
@@ -125,10 +209,143 @@ function handleIfcStats(stats) {
 
 function handleIfcDimensions(dims) {
   ifcDimensions.value = dims
+  persistIfcData()
 }
 
 function handleIfcAreas(areas) {
   ifcAreaSchedule.value = areas
+  persistIfcData()
+}
+
+function handleIfcThermal({ glazingUValue, sampleCount }) {
+  ifcGlazingUValue.value = glazingUValue
+  console.warn(`IFC thermal: U-value ${glazingUValue} W/(m²·K) averaged from ${sampleCount} window(s)`)
+}
+
+function handleIfcSchedule({ doors, windows }) {
+  if (!projectData.id) return
+  schedulesStore
+    .saveSchedule(projectData.id, { doors, windows })
+    .catch((e) => console.warn('Schedule save failed:', e))
+}
+
+function handleIfcTally(items) {
+  // Persist tally even when zero fixtures are found so the API has a row
+  // and downstream views can show explicit 0-count state instead of 404.
+  if (!projectData.id || !Array.isArray(items)) return
+  tallyStore
+    .saveTally(projectData.id, items)
+    .catch((e) => console.warn('Tally save failed:', e))
+}
+
+function handleIfcMaterials(materialItems) {
+  if (!projectData.id || !materialItems?.length) return
+  specStore
+    .compile(projectData.id, materialItems)
+    .catch((e) => console.warn('Spec compile failed:', e))
+}
+
+function handleIfcElementSelected(element) {
+  selectedIfcElement.value = element
+}
+
+function handleMeasurementUpdated(result) {
+  measurementResult.value = result
+}
+
+function handleIfcLoadError(payload) {
+  ifcLoadProgress.active = false
+  ifcLoadProgress.label = ''
+  ifcLoadProgress.percent = 0
+  ifcLoadProgress.source = 'manual'
+  const message = payload?.message || 'Could not parse this IFC file.'
+  const detail = payload?.detail || 'Ensure the file is valid IFC2x3/IFC4 and exported fully.'
+  toast.error(message, { description: detail })
+}
+
+function handleIfcLoadProgress(payload) {
+  const active = Boolean(payload?.active)
+  const label = payload?.label ?? ''
+  const rawPercent = payload?.percent
+  const source = payload?.source === 'restore' ? 'restore' : 'manual'
+
+  ifcLoadProgress.active = active
+  ifcLoadProgress.label = label
+  ifcLoadProgress.source = source
+
+  if (typeof rawPercent === 'number' && Number.isFinite(rawPercent)) {
+    ifcLoadProgress.percent = Math.max(0, Math.min(100, Math.round(rawPercent)))
+  } else if (!active) {
+    ifcLoadProgress.percent = 0
+    ifcLoadProgress.source = 'manual'
+  }
+}
+
+function clearCurrentIfcContext() {
+  complianceResult.value = null
+  energyResult.value = null
+  ifcStats.value = null
+  ifcDimensions.value = null
+  ifcAreaSchedule.value = []
+  ifcGlazingUValue.value = null
+  selectedIfcElement.value = null
+  measurementResult.value = null
+  projectData.hasModel = false
+  projectData.fileSize = '0 MB'
+}
+
+async function handleIfcActionClick() {
+  if (!projectData.hasModel) {
+    viewer3DRef.value?.openFilePicker()
+    return
+  }
+
+  const confirmed = await showPrompt({
+    mode: 'confirm',
+    title: 'Replace IFC model?',
+    message:
+      'This will clear current analysis and IFC-derived data from this session before loading a new file.',
+    confirmText: 'Replace IFC',
+    cancelText: 'Keep Current',
+    isDestructive: true,
+  })
+
+  if (!confirmed) return
+
+  clearCurrentIfcContext()
+  if (projectData.id) {
+    try {
+      window.sessionStorage.removeItem(`compliance_${projectData.id}`)
+      window.sessionStorage.removeItem(`energy_${projectData.id}`)
+    } catch {
+      // Ignore storage failures and proceed with replacement.
+    }
+  }
+  viewer3DRef.value?.openFilePicker()
+}
+
+// Silently persist IFC-extracted data to the project record.
+// Called from both handleIfcDimensions and handleIfcAreas so it fires
+// once both datasets are available (the later one will have both).
+function persistIfcData() {
+  if (!projectData.id) return
+  const dims = ifcDimensions.value
+  const areas = ifcAreaSchedule.value
+  if (!dims) return
+
+  const proposedGfaM2 =
+    areas.length > 0
+      ? parseFloat(areas.reduce((sum, r) => sum + (r.areaM2 || 0), 0).toFixed(2))
+      : null
+
+  projectsStore
+    .saveIfcData(projectData.id, {
+      proposedGfaM2,
+      footprintM2: dims.footprintM2 ?? null,
+      buildingHeightM: dims.heightM ?? null,
+      numberOfStoreys: dims.numberOfStoreys ?? null,
+    })
+    .catch((e) => console.warn('Failed to persist IFC data:', e))
 }
 
 async function handleRunAnalysis(params) {
@@ -138,15 +355,44 @@ async function handleRunAnalysis(params) {
   }
   isAnalyzing.value = true
   try {
-    const result = await complianceService.evaluate({
-      ...params,
-      siteAreaM2: projectData.siteAreaM2,
-      zoningScheme: projectData.zoning,
-    })
+    const [result, xaResult] = await Promise.all([
+      complianceService.evaluate({
+        ...params,
+        siteAreaM2: projectData.siteAreaM2,
+        zoningScheme: projectData.zoning,
+      }),
+      complianceService.evaluateEnergy({
+        ...params.energy,
+        proposedGfaM2: params.proposedGfaM2,
+        footprintM2: params.footprintM2,
+        buildingHeightM: params.buildingHeightM,
+        numberOfStoreys: params.numberOfStoreys,
+      }),
+    ])
     complianceResult.value = result
+    energyResult.value = xaResult
+    // Silently persist the sidebar params so they survive refresh
+    projectsStore.saveParams(projectData.id, {
+      proposedGfaM2: params.proposedGfaM2 || null,
+      footprintM2: params.footprintM2 || null,
+      buildingHeightM: params.buildingHeightM || null,
+      numberOfStoreys: params.numberOfStoreys || null,
+      frontSetbackM: params.frontSetbackM || null,
+      rearSetbackM: params.rearSetbackM || null,
+      sideSetbackM: params.sideSetbackM || null,
+      parkingBays: params.parkingBaysProvided || null,
+      glaForParkingM2: params.glaForParkingM2 || null,
+    }).catch((e) => console.warn('Failed to persist params:', e))
+    // Cache analysis results in sessionStorage so they survive navigation (not hard refresh)
+    try {
+      window.sessionStorage.setItem(`compliance_${projectData.id}`, JSON.stringify(result))
+      window.sessionStorage.setItem(`energy_${projectData.id}`, JSON.stringify(xaResult))
+    } catch { /* storage quota */ }
     const checks = result.checks ?? []
     const passed = checks.filter((c) => c.passed).length
-    toast.success('Analysis complete', { description: `${passed}/${checks.length} checks passed` })
+    toast.success('Analysis complete', {
+      description: `${passed}/${checks.length} checks passed · Energy rating: ${xaResult.energyRating ?? '–'}`,
+    })
   } catch (err) {
     toast.error('Analysis failed', { description: err.message })
   } finally {
@@ -191,78 +437,13 @@ async function handleCouncilPack() {
     toast.error('Council Pack failed', { description: err.message })
   }
 }
-
-function triggerHeaderAnalysis() {
-  analysisSidebarRef.value?.triggerAnalysis()
-}
 </script>
 
 <template>
-  <div class="h-[calc(100vh-140px)] flex flex-col gap-6 overflow-hidden">
-    <!-- Page Header -->
-    <header class="flex items-center justify-between bg-white border border-slate-200 p-4 rounded-xl shadow-sm shrink-0">
-      <div class="flex items-center gap-4">
-        <Button variant="ghost" size="icon" class="rounded-lg hover:bg-slate-100" @click="router.push({ name: 'dashboard' })">
-          <ChevronLeft class="h-4 w-4 text-slate-600" />
-        </Button>
-        <div class="h-8 w-[1px] bg-slate-200" />
-        <div>
-          <div v-if="isLoadingProject" class="flex items-center gap-2">
-            <Loader2 class="h-4 w-4 animate-spin text-slate-400" />
-            <span class="text-xs text-slate-400">Loading project…</span>
-          </div>
-          <template v-else-if="!projectId">
-            <h1 class="text-sm font-bold uppercase tracking-widest text-slate-400">No Project Selected</h1>
-            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Open a project from the Dashboard</p>
-          </template>
-          <template v-else>
-            <h1 class="text-sm font-bold uppercase tracking-widest text-slate-900">{{ projectData.name }}</h1>
-            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">
-              {{ projectData.muni }} • {{ projectData.zoning }}
-            </p>
-          </template>
-        </div>
-      </div>
-
-      <div class="flex items-center gap-3">
-        <div v-if="complianceScore !== null" class="text-right mr-4 hidden md:block">
-          <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Compliance Score</p>
-          <p class="text-xl font-mono font-bold" :class="scoreColorClass">{{ complianceScore }}%</p>
-        </div>
-        <div class="flex items-center gap-2">
-          <Button
-            variant="outline"
-            class="gap-2 uppercase text-xs font-bold h-9"
-            @click="viewer3DRef?.openFilePicker()"
-          >
-            <Upload class="h-3.5 w-3.5 text-blue-600" />
-            <span class="hidden sm:inline">{{ projectData.hasModel ? projectData.fileSize : 'Load IFC' }}</span>
-          </Button>
-          <Button
-            variant="outline"
-            class="gap-2 uppercase text-xs font-bold h-9 border-blue-200 bg-blue-50/30 text-blue-700 hover:bg-blue-50"
-            :disabled="!projectId || isAnalyzing"
-            @click="triggerHeaderAnalysis"
-          >
-            <Loader2 v-if="isAnalyzing" class="h-3.5 w-3.5 animate-spin" />
-            <Play v-else class="h-3.5 w-3.5 fill-current" />
-            <span class="hidden sm:inline">{{ isAnalyzing ? 'Analyzing…' : 'Run Analysis' }}</span>
-          </Button>
-          <Button
-            class="bg-slate-950 hover:bg-slate-900 text-white gap-2 uppercase text-xs font-bold h-9"
-            :disabled="!projectId"
-            @click="handleCouncilPack"
-          >
-            <FileDown class="h-3.5 w-3.5" />
-            <span class="hidden sm:inline">Council Pack</span>
-          </Button>
-        </div>
-      </div>
-    </header>
-
+  <div class="view-page h-[calc(100vh-100px)] flex flex-col">
     <!-- No project selected: inline project picker -->
     <div v-if="!projectId" class="flex-1 flex flex-col gap-4 overflow-hidden">
-      <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6 flex flex-col gap-4 h-full">
+      <div class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 flex flex-col gap-4 h-full">
         <!-- Header -->
         <div class="flex items-center justify-between shrink-0">
           <div>
@@ -291,15 +472,15 @@ function triggerHeaderAnalysis() {
         <!-- Project list -->
         <div class="flex-1 overflow-y-auto">
           <div v-if="projectsStore.loading" class="space-y-2">
-            <div v-for="n in 5" :key="n" class="h-14 bg-slate-100 rounded-lg animate-pulse" />
+            <div v-for="n in 5" :key="n" class="h-14 bg-slate-100 dark:bg-slate-800 rounded-lg animate-pulse" />
           </div>
 
           <div
             v-else-if="pickerProjects.length === 0"
             class="flex flex-col items-center justify-center h-full py-16 text-center"
           >
-            <FolderOpen class="h-10 w-10 text-slate-200 mb-3" />
-            <p class="text-sm font-medium text-slate-400">
+            <FolderOpen class="h-10 w-10 text-slate-200 dark:text-slate-700 mb-3" />
+            <p class="text-sm font-medium text-slate-400 dark:text-slate-500">
               {{ pickerSearch ? 'No projects match your search.' : 'No projects yet — create your first one.' }}
             </p>
             <Button
@@ -314,23 +495,23 @@ function triggerHeaderAnalysis() {
             <li
               v-for="p in pickerProjects"
               :key="p.id"
-              class="flex items-center gap-4 px-4 py-3 rounded-lg border border-slate-100 bg-slate-50/60 hover:bg-white hover:border-blue-200 hover:shadow-sm cursor-pointer transition-all group"
+              class="flex items-center gap-4 px-4 py-3 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/60 hover:bg-white dark:hover:bg-slate-900 hover:border-blue-200 dark:hover:border-blue-900 hover:shadow-sm cursor-pointer transition-all group"
               @click="router.push({ name: 'workbench', params: { projectId: p.id } })"
             >
               <div class="flex-shrink-0 h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
                 <Building2 class="h-4 w-4 text-primary" />
               </div>
               <div class="flex-1 min-w-0">
-                <p class="text-sm font-bold text-slate-800 truncate">{{ p.name }}</p>
-                <p class="text-[11px] text-slate-400">
+                <p class="text-sm font-bold text-slate-800 dark:text-slate-200 truncate">{{ p.name }}</p>
+                <p class="text-[11px] text-slate-400 dark:text-slate-500">
                   {{ p.municipality }} &middot; {{ p.zoningScheme }}
                 </p>
               </div>
               <div class="flex-shrink-0 flex items-center gap-2">
-                <span class="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full uppercase">
+                <span class="text-[10px] font-bold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full uppercase">
                   {{ p.status === 'SubmittedToCouncil' ? 'In Council' : p.status }}
                 </span>
-                <ArrowRight class="h-4 w-4 text-slate-300 group-hover:text-blue-500 transition-colors" />
+                <ArrowRight class="h-4 w-4 text-slate-300 dark:text-slate-600 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors" />
               </div>
             </li>
           </ul>
@@ -339,42 +520,166 @@ function triggerHeaderAnalysis() {
     </div>
 
     <!-- Workspace Grid -->
-    <main v-else class="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-6 min-h-0">
-      <!-- 3D Viewport -->
-      <section class="min-h-[400px] relative rounded-xl border border-slate-200 bg-[#0f172a] overflow-hidden shadow-2xl">
-        <Viewer3D
-          ref="viewer3DRef"
-          :project-id="projectId"
-          :tenant-id="authStore.profile?.tenant_id ?? null"
-          :ifc-path="projectData.ifcPath"
-          @ifc-loaded="handleIfcLoaded"
-          @ifc-stats="handleIfcStats"
-          @ifc-dimensions="handleIfcDimensions"
-          @ifc-areas="handleIfcAreas"
-          @ifc-path-saved="handleIfcPathSaved"
-        />
-        <div class="absolute bottom-4 left-4 flex gap-2">
-          <Badge
-            variant="secondary"
-            class="bg-slate-950/80 text-white border-slate-700 backdrop-blur-md uppercase text-[10px]"
-          >
-            Engine: WebGL v2
-          </Badge>
-        </div>
-      </section>
+    <main v-else class="flex-1 min-h-0">
+      <div class="relative h-full min-h-0">
+        <div
+          class="h-full transition-opacity duration-300"
+          :class="projectData.hasModel ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'"
+        >
+          <div class="grid h-full min-h-0 grid-cols-1 gap-6 lg:grid-cols-[1fr_400px]">
+            <!-- 3D Viewport -->
+            <section class="min-h-[400px] relative rounded-xl border border-slate-200 bg-[#0f172a] overflow-hidden shadow-2xl">
+              <Viewer3D
+                ref="viewer3DRef"
+                :project-id="projectId"
+                :tenant-id="authStore.profile?.tenant_id ?? null"
+                :ifc-path="projectData.ifcPath"
+                @ifc-loaded="handleIfcLoaded"
+                @ifc-load-progress="handleIfcLoadProgress"
+                @ifc-stats="handleIfcStats"
+                @ifc-dimensions="handleIfcDimensions"
+                @ifc-areas="handleIfcAreas"
+                @ifc-path-saved="handleIfcPathSaved"
+                @ifc-thermal="handleIfcThermal"
+                @ifc-schedule="handleIfcSchedule"
+                @ifc-tally="handleIfcTally"
+                @ifc-materials="handleIfcMaterials"
+                @element-selected="handleIfcElementSelected"
+                @measurement-updated="handleMeasurementUpdated"
+                @ifc-load-error="handleIfcLoadError"
+              />
+            </section>
 
-      <!-- Analysis Sidebar -->
-      <aside class="flex flex-col min-h-0 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <AnalysisSidebar
-          ref="analysisSidebarRef"
-          :project="{ siteAreaM2: projectData.siteAreaM2, zoningScheme: projectData.zoning }"
-          :compliance-result="complianceResult"
-          :ifc-stats="ifcStats"
-          :ifc-dimensions="ifcDimensions"
-          :is-analyzing="isAnalyzing"
-          @run-analysis="handleRunAnalysis"
-        />
-      </aside>
+            <div v-if="projectData.hasModel" class="flex min-h-0 flex-col gap-3">
+              <!-- Standalone action cards -->
+              <div class="shrink-0 relative grid grid-cols-3 gap-3">
+                <div class="pointer-events-none absolute inset-x-0 -top-1 z-10 flex justify-center">
+                  <div
+                    class="flex items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-4 py-2.5 shadow-sm transition-all duration-200"
+                    :class="isLoadingProject ? 'translate-y-0 opacity-100' : '-translate-y-1 opacity-0'"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <Loader2 class="h-3.5 w-3.5 animate-spin text-slate-400 dark:text-slate-500" />
+                    <span class="text-xs text-slate-400 dark:text-slate-500">Loading project...</span>
+                  </div>
+                </div>
+
+                <Button
+                  variant="outline"
+                  class="h-10 w-full gap-2 px-3 text-[10px] font-bold uppercase rounded-xl border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 dark:text-slate-200 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-800"
+                  @click="handleIfcActionClick"
+                >
+                  <Upload class="h-3.5 w-3.5 text-blue-600 dark:text-blue-500" />
+                  <span>{{ projectData.hasModel ? 'Replace IFC' : 'Load IFC' }}</span>
+                </Button>
+
+                <Button
+                  class="h-10 w-full gap-2 bg-slate-900 dark:bg-slate-800 px-3 text-[10px] font-bold uppercase text-white dark:text-slate-100 hover:bg-slate-800 dark:hover:bg-slate-700 rounded-xl shadow-sm"
+                  :disabled="!projectId"
+                  @click="handleCouncilPack"
+                >
+                  <FileDown class="h-3.5 w-3.5" />
+                  <span>Council Pack</span>
+                </Button>
+
+                <div
+                  class="h-10 flex items-center justify-center rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm px-3 text-[10px] font-bold uppercase whitespace-nowrap"
+                  :class="complianceScore === null ? 'text-slate-400 dark:text-slate-500' : scoreColorClass"
+                >
+                  {{ passRateLabel }}
+                </div>
+              </div>
+
+              <!-- Analysis Sidebar -->
+              <aside class="flex flex-col min-h-0 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                <AnalysisSidebar
+                  :project="{ siteAreaM2: projectData.siteAreaM2, zoningScheme: projectData.zoning,
+                    proposedGfaM2: projectData.proposedGfaM2, footprintM2: projectData.footprintM2,
+                    numberOfStoreys: projectData.numberOfStoreys, buildingHeightM: projectData.buildingHeightM,
+                    frontSetbackM: projectData.frontSetbackM, rearSetbackM: projectData.rearSetbackM,
+                    sideSetbackM: projectData.sideSetbackM, parkingBays: projectData.parkingBays,
+                    glaForParkingM2: projectData.glaForParkingM2 }"
+                  :compliance-result="complianceResult"
+                  :energy-result="energyResult"
+                  :ifc-stats="ifcStats"
+                  :ifc-dimensions="ifcDimensions"
+                  :is-analyzing="isAnalyzing"
+                  :province="projectData.province"
+                  :ifc-glazing-u-value="ifcGlazingUValue"
+                  @run-analysis="handleRunAnalysis"
+                />
+              </aside>
+            </div>
+          </div>
+        </div>
+
+        <div
+          v-if="showWorkbenchRestoreSkeleton"
+          class="absolute inset-0 rounded-2xl border border-slate-200 dark:border-slate-800 bg-gradient-to-b from-slate-50 to-white dark:from-slate-950 dark:to-slate-950 p-4 md:p-6"
+        >
+          <div class="mb-4 flex items-center gap-2 text-slate-500 dark:text-slate-400">
+            <Loader2 class="h-4 w-4 animate-spin" />
+            <p class="text-xs font-semibold uppercase tracking-wide">
+              {{ ifcLoadProgress.label || 'Restoring existing IFC workspace...' }}
+            </p>
+          </div>
+
+          <div class="grid h-[calc(100%-2rem)] min-h-0 grid-cols-1 gap-6 lg:grid-cols-[1fr_400px]">
+            <div class="h-full min-h-[340px] animate-pulse rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100/70 dark:bg-slate-800/70" />
+
+            <div class="hidden min-h-0 flex-col gap-4 lg:flex">
+              <div class="h-14 animate-pulse rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100/80 dark:bg-slate-800/80" />
+              <div class="flex-1 animate-pulse rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100/70 dark:bg-slate-800/70" />
+            </div>
+          </div>
+        </div>
+
+        <div
+          v-if="showWorkbenchEmptyState"
+          class="absolute inset-0 flex items-center justify-center rounded-2xl border border-slate-200 dark:border-slate-800 bg-[radial-gradient(ellipse_at_top,#e0f2fe_0%,#ffffff_55%,#f8fafc_100%)] dark:bg-[radial-gradient(ellipse_at_top,#0f172a_0%,#020617_55%,#020617_100%)] p-6"
+        >
+          <div class="w-full max-w-2xl rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white/85 dark:bg-slate-900/85 p-8 shadow-xl backdrop-blur-sm">
+            <div class="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 dark:bg-slate-800 text-blue-600 dark:text-blue-400 ring-1 ring-blue-100 dark:ring-slate-700">
+              <Upload class="h-6 w-6" />
+            </div>
+
+            <div class="text-center">
+              <p class="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-600/80 dark:text-blue-400/80">Workbench</p>
+              <h2 class="mt-2 text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">Load IFC Model</h2>
+              <p class="mx-auto mt-3 max-w-xl text-sm text-slate-500 dark:text-slate-400">
+                Start by loading an IFC file to open the 3D workspace, analysis panel, and compliance tools.
+              </p>
+            </div>
+
+            <div class="mt-8 flex flex-col items-center gap-3">
+              <Button
+                class="h-10 gap-2 bg-blue-600 px-5 text-xs font-bold uppercase tracking-wide text-white hover:bg-blue-700"
+                :disabled="isLoadingProject || isManualIfcProgress"
+                @click="handleIfcActionClick"
+              >
+                <Loader2 v-if="isLoadingProject || isManualIfcProgress" class="h-3.5 w-3.5 animate-spin" />
+                <Upload v-else class="h-3.5 w-3.5" />
+                <span>{{ isLoadingProject ? 'Preparing Workspace...' : (isManualIfcProgress ? 'Loading IFC...' : 'Load IFC Model') }}</span>
+              </Button>
+              <p class="text-[11px] text-slate-400">IFC2x3 and IFC4 formats are supported.</p>
+
+              <div v-if="isManualIfcProgress" class="w-full max-w-md rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-3">
+                <div class="mb-1.5 flex items-center justify-between gap-2 text-[11px]">
+                  <span class="truncate text-slate-600 dark:text-slate-400">{{ ifcLoadProgress.label || 'Processing IFC...' }}</span>
+                  <span class="font-mono font-bold text-slate-500 dark:text-slate-400">{{ ifcLoadProgress.percent }}%</span>
+                </div>
+                <div class="h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+                  <div
+                    class="h-full rounded-full bg-blue-600 transition-all duration-300"
+                    :style="{ width: `${ifcLoadProgress.percent}%` }"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </main>
   </div>
 </template>

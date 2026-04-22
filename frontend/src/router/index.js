@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth.store'
+import { useUiStore } from '@/stores/ui.store.js'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -89,6 +90,7 @@ const router = createRouter({
           component: () => import('@/views/dashboard/DashboardView.vue'),
           meta: {
             breadcrumb: 'Dashboard',
+            title: 'Command Center',
           },
         },
         {
@@ -98,6 +100,63 @@ const router = createRouter({
           props: true,
           meta: {
             breadcrumb: 'Workbench',
+            title: 'Workbench',
+            requiresProject: true,
+          },
+        },
+        {
+          path: 'schedules/:projectId?',
+          name: 'schedules',
+          component: () => import('@/views/schedules/SchedulesView.vue'),
+          props: true,
+          meta: {
+            breadcrumb: 'Schedules',
+            title: 'Schedules',
+            requiresProject: true,
+          },
+        },
+        {
+          path: 'tally/:projectId?',
+          name: 'tally',
+          component: () => import('@/views/tally/TallyView.vue'),
+          props: true,
+          meta: {
+            breadcrumb: 'Fixture Tally',
+            title: 'Fixture Tally',
+            requiresProject: true,
+          },
+        },
+        {
+          path: 'specs/:projectId?',
+          name: 'specs',
+          component: () => import('@/views/specs/SpecView.vue'),
+          props: true,
+          meta: {
+            breadcrumb: 'Specifications',
+            title: 'Specifications',
+            requiresProject: true,
+          },
+        },
+        {
+          path: 'exports/:projectId?',
+          name: 'exports',
+          component: () => import('@/views/exports/ExportView.vue'),
+          props: true,
+          meta: {
+            breadcrumb: 'Export Documents',
+            title: 'Export Documents',
+            requiresProject: true,
+          },
+        },
+        {
+          path: 'zoning/:projectId?',
+          name: 'zoning',
+          component: () => import('@/views/zoning/ZoningView.vue'),
+          props: true,
+          meta: {
+            breadcrumb: 'Zoning Calculator',
+            title: 'Zoning Calculator',
+            requiresProject: true,
           },
         },
         {
@@ -106,6 +165,7 @@ const router = createRouter({
           component: () => import('@/views/stakeholder-registry/StakeholderRegistry.vue'),
           meta: {
             breadcrumb: 'Stakeholders',
+            title: 'Stakeholders',
           },
         },
         {
@@ -114,6 +174,7 @@ const router = createRouter({
           component: () => import('@/views/knowledge-base/KnowledgeBaseView.vue'),
           meta: {
             breadcrumb: 'Knowledge Base',
+            title: 'Knowledge Base',
           },
         },
         {
@@ -122,6 +183,8 @@ const router = createRouter({
           component: () => import('@/views/council-pack/CouncilPackView.vue'),
           meta: {
             breadcrumb: 'Council Pack',
+            title: 'Council Pack',
+            requiresProject: true,
           },
         },
         {
@@ -130,6 +193,8 @@ const router = createRouter({
           component: () => import('@/views/rejection-tracker/RejectionTrackerView.vue'),
           meta: {
             breadcrumb: 'Rejection Tracker',
+            title: 'Rejection Tracker',
+            requiresProject: true,
           },
         },
         {
@@ -138,6 +203,7 @@ const router = createRouter({
           component: () => import('@/views/settings/SettingsView.vue'),
           meta: {
             breadcrumb: 'Settings',
+            title: 'Settings',
           },
         },
         {
@@ -147,6 +213,33 @@ const router = createRouter({
           meta: {
             breadcrumb: 'Change Password',
           },
+        },
+        {
+          path: 'foundation/:projectId?',
+          name: 'foundation',
+          component: () => import('@/views/foundation/FoundationView.vue'),
+          props: true,
+          meta: { breadcrumb: 'Foundation Compliance',
+            title: 'Foundation Compliance',
+            requiresProject: true },
+        },
+        {
+          path: 'roofcheck/:projectId?',
+          name: 'roofcheck',
+          component: () => import('@/views/roofcheck/RoofCheckView.vue'),
+          props: true,
+          meta: { breadcrumb: 'Roof Checklist',
+            title: 'Roof Checklist',
+            requiresProject: true },
+        },
+        {
+          path: 'gascheck/:projectId?',
+          name: 'gascheck',
+          component: () => import('@/views/gascheck/GasCheckView.vue'),
+          props: true,
+          meta: { breadcrumb: 'Gas Installation',
+            title: 'Gas Installation',
+            requiresProject: true },
         },
       ],
     },
@@ -160,6 +253,7 @@ const router = createRouter({
 
 router.beforeEach(async (to) => {
   const authStore = useAuthStore()
+  const uiStore = useUiStore()
 
   if (!authStore.initialized) {
     await authStore.initializeSession()
@@ -185,7 +279,8 @@ router.beforeEach(async (to) => {
   //  (a) it hasn't run yet this session, OR
   //  (b) it ran but still thinks onboarding is needed — re-check in case
   //      the user completed onboarding in another tab/window
-  if (!authStore.profileLoaded || authStore.needsOnboarding) {
+  const missingTenantContext = !authStore.tenantId
+  if (!authStore.profileLoaded || authStore.needsOnboarding || missingTenantContext) {
     authStore.profileLoaded = false  // force a re-fetch when needsOnboarding is true
     try {
       await authStore.bootstrapProfile()
@@ -202,6 +297,35 @@ router.beforeEach(async (to) => {
   // Prevent already-onboarded users from re-visiting onboarding
   if (!authStore.needsOnboarding && to.meta.onboarding) {
     return { name: 'dashboard' }
+  }
+
+  // Enforce project context on project-scoped routes.
+  const requiresProject = to.matched.some((record) => Boolean(record.meta?.requiresProject))
+  if (requiresProject) {
+    const routeProjectId = typeof to.params.projectId === 'string' ? to.params.projectId : null
+    const hasProjectParamSlot = to.matched.some((record) => record.path.includes(':projectId'))
+    const lastProjectId = uiStore.lastProjectId
+
+    // Auto-hydrate routes with optional :projectId from the last active project.
+    if (hasProjectParamSlot && !routeProjectId && lastProjectId) {
+      return {
+        name: to.name,
+        params: { ...to.params, projectId: lastProjectId },
+        query: to.query,
+        hash: to.hash,
+      }
+    }
+
+    // Hard-stop if no project context exists at all.
+    if (!routeProjectId && !lastProjectId) {
+      return {
+        path: '/dashboard',
+        query: {
+          projectRequired: '1',
+          redirect: to.fullPath,
+        },
+      }
+    }
   }
 
   return true

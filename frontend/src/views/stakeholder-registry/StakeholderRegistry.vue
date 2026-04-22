@@ -6,11 +6,8 @@ import {
   Search,
   Filter,
   MoreHorizontal,
-  ExternalLink,
-  Briefcase,
+  Download,
   FileBadge,
-  Mail,
-  Phone,
 } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -47,27 +44,7 @@ const getRoleBadgeColor = (role) => {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <!-- Page Header -->
-    <header class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-      <div>
-        <h1 class="text-2xl font-bold tracking-tight text-slate-900 uppercase">
-          Stakeholder Registry
-        </h1>
-        <p class="text-sm text-slate-500">
-          Manage property owners and specialized consultants for municipal submissions.
-        </p>
-      </div>
-      <div class="flex flex-wrap items-center gap-2">
-        <Button
-          @click="isAddModalOpen = true"
-          class="bg-blue-600 hover:bg-blue-700 gap-2 uppercase text-xs font-bold"
-        >
-          <UserPlus class="h-4 w-4" /> Quick Add Stakeholder
-        </Button>
-      </div>
-    </header>
-
+  <div class="view-page">
     <div class="grid grid-cols-1 xl:grid-cols-[1fr_400px] gap-6 items-start">
       <!-- Main List -->
       <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -102,8 +79,8 @@ const getRoleBadgeColor = (role) => {
               <tr
                 v-for="s in filteredStakeholders"
                 :key="s.id"
-                @click="selectedStakeholder = s"
                 class="hover:bg-slate-50/80 cursor-pointer transition-colors group"
+                @click="selectedStakeholder = s"
               >
                 <td class="px-6 py-4">
                   <div class="flex items-center gap-3">
@@ -158,20 +135,38 @@ const getRoleBadgeColor = (role) => {
       </div>
 
       <!-- Detail View (Contact Card) -->
-      <aside v-if="selectedStakeholder" class="sticky top-6">
-        <StakeholderDetailView :stakeholder="selectedStakeholder" />
-      </aside>
-      <div
-        v-else
-        class="h-[400px] border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center text-center p-8"
-      >
-        <Users class="h-10 w-10 text-slate-200 mb-4" />
-        <p class="text-sm font-bold text-slate-400 uppercase tracking-widest">
-          No Stakeholder Selected
-        </p>
-        <p class="text-xs text-slate-400 mt-2">
-          Select a row to view linked projects and title deed details.
-        </p>
+      <div class="flex flex-col gap-6 sticky top-6">
+        <!-- Actions above details -->
+        <div class="flex justify-end gap-3">
+          <Button
+            variant="outline"
+            class="hidden h-9 gap-2 rounded-lg border-slate-200 bg-white px-3 text-[11px] font-bold uppercase tracking-wider dark:bg-slate-900 dark:border-slate-800 dark:text-slate-300 md:flex"
+            disabled
+          >
+            <Download class="h-4 w-4 text-slate-500" />
+            <span>Export</span>
+          </Button>
+          <Button
+            class="h-9 gap-2 rounded-lg bg-blue-600 px-3 text-[11px] font-bold uppercase tracking-wider text-white shadow-md shadow-blue-900/10 hover:bg-blue-700"
+            @click="isAddModalOpen = true"
+          >
+            <UserPlus class="h-4 w-4" /> Quick Add Stakeholder
+          </Button>
+        </div>
+
+        <StakeholderDetailView v-if="selectedStakeholder" :stakeholder="selectedStakeholder" />
+        <div
+          v-else
+          class="h-[400px] border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center text-center p-8"
+        >
+          <Users class="h-10 w-10 text-slate-200 mb-4" />
+          <p class="text-sm font-bold text-slate-400 uppercase tracking-widest">
+            No Stakeholder Selected
+          </p>
+          <p class="text-xs text-slate-400 mt-2">
+            Select a row to view linked projects and title deed details.
+          </p>
+        </div>
       </div>
     </div>
 

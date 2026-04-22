@@ -36,9 +36,26 @@ var defaultConnection =
 
 if (string.IsNullOrWhiteSpace(defaultConnection))
 {
+    var pgHost = Environment.GetEnvironmentVariable("PGHOST");
+    var pgPort = Environment.GetEnvironmentVariable("PGPORT") ?? "5432";
+    var pgDatabase = Environment.GetEnvironmentVariable("PGDATABASE") ?? "postgres";
+    var pgUser = Environment.GetEnvironmentVariable("PGUSER");
+    var pgPassword = Environment.GetEnvironmentVariable("PGPASSWORD");
+
+    if (!string.IsNullOrWhiteSpace(pgHost)
+        && !string.IsNullOrWhiteSpace(pgUser)
+        && !string.IsNullOrWhiteSpace(pgPassword))
+    {
+        defaultConnection =
+            $"Host={pgHost};Port={pgPort};Database={pgDatabase};Username={pgUser};Password={pgPassword};SSL Mode=Require;Trust Server Certificate=true";
+    }
+}
+
+if (string.IsNullOrWhiteSpace(defaultConnection))
+{
     throw new InvalidOperationException(
         "Database connection is not configured. Set one of: " +
-        "ConnectionStrings__DefaultConnection or DATABASE_URL.");
+        "ConnectionStrings__DefaultConnection, DATABASE_URL, or Railway PGHOST/PGUSER/PGPASSWORD variables.");
 }
 
 var npgsqlDataSourceBuilder = new NpgsqlDataSourceBuilder(defaultConnection);
@@ -132,6 +149,11 @@ builder.Services.AddCors(options =>
 // Domain services
 builder.Services.AddScoped<ZoningEngine>();
 builder.Services.AddScoped<Sans10400Engine>();
+builder.Services.AddScoped<XaEnergyEngine>();
+builder.Services.AddScoped<SpecEngine>();
+builder.Services.AddScoped<FoundationEngine>();
+builder.Services.AddScoped<RoofCheckEngine>();
+builder.Services.AddScoped<GasCheckEngine>();
 builder.Services.AddScoped<CouncilTableGenerator>();
 builder.Services.AddScoped<PdfOcrService>();
 builder.Services.AddScoped<RejectionParserService>();

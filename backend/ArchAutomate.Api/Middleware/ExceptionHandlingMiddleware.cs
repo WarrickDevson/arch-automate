@@ -2,20 +2,31 @@ using System.Text.Json;
 
 namespace ArchAutomate.Api.Middleware;
 
-public class ExceptionHandlingMiddleware(
-    RequestDelegate next,
-    ILogger<ExceptionHandlingMiddleware> logger,
-    IHostEnvironment env)
+public class ExceptionHandlingMiddleware
 {
+    private readonly RequestDelegate _next;
+    private readonly ILogger<ExceptionHandlingMiddleware> _logger;
+    private readonly IHostEnvironment _env;
+
+    public ExceptionHandlingMiddleware(
+        RequestDelegate next,
+        ILogger<ExceptionHandlingMiddleware> logger,
+        IHostEnvironment env)
+    {
+        _next = next;
+        _logger = logger;
+        _env = env;
+    }
+
     public async Task InvokeAsync(HttpContext context)
     {
         try
         {
-            await next(context);
+            await _next(context);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Unhandled exception on {Method} {Path}",
+            _logger.LogError(ex, "Unhandled exception on {Method} {Path}",
                 context.Request.Method, context.Request.Path);
             await WriteErrorResponse(context, ex);
         }
@@ -39,7 +50,7 @@ public class ExceptionHandlingMiddleware(
         {
             status = statusCode,
             error = message,
-            detail = env.IsDevelopment() ? ex.ToString() : null,
+            detail = _env.IsDevelopment() ? ex.ToString() : null,
             traceId = context.TraceIdentifier
         });
 

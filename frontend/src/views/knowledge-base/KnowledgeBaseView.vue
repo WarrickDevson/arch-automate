@@ -1,27 +1,20 @@
 <script setup>
-import { Library, Search, Filter, BookOpen } from 'lucide-vue-next'
+import { Search, BookOpen } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 </script>
 
 <template>
-  <div class="space-y-6">
-    <!-- Page Header -->
-    <header class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-      <div>
-        <h1 class="text-2xl font-bold tracking-tight text-slate-900 uppercase">Knowledge Base</h1>
-        <p class="text-sm text-slate-500">SANS 10400 standards and architectural guidelines.</p>
+  <div class="view-page">
+    <div class="mb-6 flex justify-end">
+      <div class="relative">
+        <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+        <Input
+          placeholder="Search SANS codes..."
+          class="h-9 w-64 border-slate-200 pl-9 text-xs dark:bg-slate-900 dark:border-slate-800"
+        />
       </div>
-      <div class="flex flex-wrap items-center gap-2 text-slate-400">
-        <div class="relative">
-          <Search class="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-          <Input
-            placeholder="Search SANS codes..."
-            class="pl-9 h-9 w-64 text-xs border-slate-200"
-          />
-        </div>
-      </div>
-    </header>
+    </div>
 
     <!-- Main Grid -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

@@ -129,23 +129,139 @@ body {
 
 @layer components {
   .page-title {
-    @apply text-2xl font-extrabold leading-tight tracking-tighter text-slate-900 uppercase md:text-3xl;
+    @apply text-2xl font-extrabold leading-tight tracking-tighter text-slate-900 dark:text-slate-100 uppercase md:text-3xl;
   }
 
   .page-subtitle {
-    @apply mt-1 text-sm font-medium text-slate-500 tracking-tight;
+    @apply mt-1 text-sm font-medium text-slate-500 dark:text-slate-400 tracking-tight;
   }
 
   .page-action-btn {
-    @apply inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-bold uppercase tracking-widest text-slate-700 shadow-sm transition hover:bg-slate-50 active:scale-95;
+    @apply inline-flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2 text-xs font-bold uppercase tracking-widest text-slate-700 dark:text-slate-200 shadow-sm transition hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95;
   }
 
   .page-action-btn-primary {
-    @apply inline-flex items-center gap-2 rounded-lg bg-slate-900 px-5 py-2 text-xs font-bold uppercase tracking-widest text-white shadow-md transition hover:bg-slate-800 active:scale-95;
+    @apply inline-flex items-center gap-2 rounded-lg bg-slate-900 dark:bg-slate-100 px-5 py-2 text-xs font-bold uppercase tracking-widest text-white dark:text-slate-900 shadow-md transition hover:bg-slate-800 dark:hover:bg-slate-200 active:scale-95;
   }
 
   /* Technical Labels for SANS 10400 forms */
   .tech-label {
-    @apply text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1 block;
+    @apply text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-1 block;
   }
 }
+
+[data-theme='dark'] .bg-white {
+}
+
+[data-theme='dark'] .border-slate-200 {
+}
+
+[data-theme='dark'] .text-slate-900 {
+}
+
+[data-theme='dark'] .text-slate-800 {
+}
+
+[data-theme='dark'] .text-slate-500 {
+}
+
+[data-theme='dark'] .bg-slate-50 {
+}
+
+
+/* Quick global dark-mode fixes for hardcoded utility classes across all pages */
+[data-theme='dark'] .bg-white {
+  background-color: theme('colors.slate.900') !important;
+}
+[data-theme='dark'] .bg-slate-50\/60 {
+  background-color: theme('colors.slate.950') !important;
+}
+[data-theme='dark'] .bg-slate-50 {
+  background-color: theme('colors.slate.950') !important;
+}
+[data-theme='dark'] .bg-slate-100 {
+  background-color: theme('colors.slate.800') !important;
+}
+[data-theme='dark'] .border-slate-200 {
+  border-color: theme('colors.slate.800') !important;
+}
+[data-theme='dark'] .border-slate-100 {
+  border-color: theme('colors.slate.800') !important;
+}
+[data-theme='dark'] .text-slate-900 {
+  color: theme('colors.slate.100') !important;
+}
+[data-theme='dark'] .text-slate-800 {
+  color: theme('colors.slate.200') !important;
+}
+[data-theme='dark'] .text-slate-700 {
+  color: theme('colors.slate.300') !important;
+}
+[data-theme='dark'] .text-slate-600 {
+  color: theme('colors.slate.300') !important;
+}
+[data-theme='dark'] .text-slate-500 {
+  color: theme('colors.slate.400') !important;
+}
+
+/* Dynamic status colors mapping for dark mode */
+[data-theme='dark'] .bg-blue-50 { background-color: theme('colors.blue.950') !important; }
+[data-theme='dark'] .text-blue-600 { color: theme('colors.blue.400') !important; }
+[data-theme='dark'] .border-blue-200 { border-color: theme('colors.blue.900') !important; }
+
+[data-theme='dark'] .bg-amber-50 { background-color: theme('colors.amber.950') !important; }
+[data-theme='dark'] .text-amber-600 { color: theme('colors.amber.400') !important; }
+[data-theme='dark'] .border-amber-200 { border-color: theme('colors.amber.900') !important; }
+
+[data-theme='dark'] .bg-purple-50 { background-color: theme('colors.purple.950') !important; }
+[data-theme='dark'] .text-purple-600 { color: theme('colors.purple.400') !important; }
+[data-theme='dark'] .border-purple-200 { border-color: theme('colors.purple.900') !important; }
+
+[data-theme='dark'] .bg-emerald-50 { background-color: theme('colors.emerald.950') !important; }
+[data-theme='dark'] .text-emerald-600 { color: theme('colors.emerald.400') !important; }
+[data-theme='dark'] .border-emerald-200 { border-color: theme('colors.emerald.900') !important; }
+
+[data-theme='dark'] .bg-rose-50 { background-color: theme('colors.rose.950') !important; }
+[data-theme='dark'] .text-rose-600 { color: theme('colors.rose.400') !important; }
+[data-theme='dark'] .border-rose-200 { border-color: theme('colors.rose.900') !important; }
+
+/* Global dark-mode hover overrides */
+[data-theme='dark'] .hover\:bg-slate-50:hover { background-color: theme('colors.slate.800') !important; }
+[data-theme='dark'] .hover\:bg-slate-100:hover { background-color: theme('colors.slate.800') !important; }
+[data-theme='dark'] .hover\:bg-white:hover { background-color: theme('colors.slate.700') !important; }
+[data-theme='dark'] .hover\:border-blue-200:hover { border-color: theme('colors.blue.800') !important; }
+
+/* Global dark-mode fixes for tables and headers */
+[data-theme='dark'] .bg-slate-50\/50 { background-color: theme('colors.slate.950') !important; }
+[data-theme='dark'] .bg-slate-50\/30 { background-color: theme('colors.slate.950') !important; }
+[data-theme='dark'] .bg-slate-50\/80 { background-color: theme('colors.slate.800') !important; }
+
+
+/* Dashboard 'Revised' card fix */
+[data-theme='dark'] .bg-violet-50 { background-color: theme('colors.violet.950') !important; }
+[data-theme='dark'] .text-violet-600 { color: theme('colors.violet.400') !important; }
+[data-theme='dark'] .border-violet-100 { border-color: theme('colors.violet.900') !important; }
+
+
+/* Global dark-mode fixes for form controls */
+[data-theme='dark'] select {
+  background-color: theme('colors.slate.950') !important;
+  color: theme('colors.slate.100') !important;
+  border-color: theme('colors.slate.700') !important;
+}
+
+/* Global dark-mode fixes for specs headers and buttons */
+[data-theme='dark'] .bg-slate-50 { background-color: theme('colors.slate.900') !important; }
+[data-theme='dark'] .bg-slate-50\/70 { background-color: theme('colors.slate.900') !important; }
+[data-theme='dark'] .bg-slate-100 { background-color: theme('colors.slate.800') !important; }
+
+/* Fixing specview specific classes */
+[data-theme='dark'] .bg-indigo-50 { background-color: theme('colors.indigo.950') !important; }
+[data-theme='dark'] .text-indigo-600 { color: theme('colors.indigo.400') !important; }
+[data-theme='dark'] .border-indigo-100 { border-color: theme('colors.indigo.900') !important; }
+
+/* Fix for Sanitary tally card */
+[data-theme='dark'] .bg-cyan-50 { background-color: theme('colors.cyan.950') !important; }
+[data-theme='dark'] .text-cyan-500 { color: theme('colors.cyan.400') !important; }
+[data-theme='dark'] .text-cyan-600 { color: theme('colors.cyan.400') !important; }
+[data-theme='dark'] .border-cyan-200 { border-color: theme('colors.cyan.900') !important; }

@@ -1,24 +1,43 @@
 import { reactive } from 'vue'
 
 export const promptState = reactive({
+  open: false,
   isOpen: false,
+  mode: 'confirm',
   title: '',
+  message: '',
   description: '',
+  confirmText: 'Confirm',
+  cancelText: 'Cancel',
   confirmLabel: 'Confirm',
   cancelLabel: 'Cancel',
-  variant: 'default'
+  isDestructive: false,
+  variant: 'default',
 })
 
 let resolveFn = null
 
 export function showPrompt(options) {
+  const mode = options.mode || 'confirm'
+  const message = options.message || options.description || ''
+  const confirmText = options.confirmText || options.confirmLabel || 'Confirm'
+  const cancelText = options.cancelText || options.cancelLabel || 'Cancel'
+  const isDestructive =
+    options.isDestructive === true || options.variant === 'destructive'
+
   Object.assign(promptState, {
+    open: true,
     isOpen: true,
+    mode,
     title: options.title || '',
-    description: options.description || '',
-    confirmLabel: options.confirmLabel || 'Confirm',
-    cancelLabel: options.cancelLabel || 'Cancel',
-    variant: options.variant || 'default'
+    message,
+    description: message,
+    confirmText,
+    cancelText,
+    confirmLabel: confirmText,
+    cancelLabel: cancelText,
+    isDestructive,
+    variant: options.variant || (isDestructive ? 'destructive' : 'default'),
   })
 
   return new Promise((resolve) => {
@@ -27,6 +46,7 @@ export function showPrompt(options) {
 }
 
 export function resolvePrompt(result) {
+  promptState.open = false
   promptState.isOpen = false
   if (resolveFn) {
     resolveFn(result)
