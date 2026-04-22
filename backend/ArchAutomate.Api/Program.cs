@@ -163,6 +163,7 @@ builder.Services.AddScoped<FoundationEngine>();
 builder.Services.AddScoped<RoofCheckEngine>();
 builder.Services.AddScoped<GasCheckEngine>();
 builder.Services.AddScoped<CouncilTableGenerator>();
+builder.Services.AddScoped<SansFormGenerator>();
 builder.Services.AddScoped<PdfOcrService>();
 builder.Services.AddScoped<RejectionParserService>();
 

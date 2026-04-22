@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { exportPdf, exportExcel } from '@/services/exportService'
+import { councilPackService } from '@/services/councilPackService'
 import { useProjectsStore } from '@/stores/projects.store'
 import { useSchedulesStore } from '@/stores/schedules.store'
 import { useTallyStore } from '@/stores/tally.store'
@@ -31,6 +32,7 @@ const uiStore = useUiStore()
 const isLoading = ref(false)
 const isExportingPdf = ref(false)
 const isExportingXls = ref(false)
+const isExportingSans = ref(false)
 
 const pickerSearch = ref('')
 
@@ -215,6 +217,22 @@ async function handleExportExcel() {
   }
 }
 
+async function handleExportSans() {
+  isExportingSans.value = true
+  try {
+    const p = project.value
+    if (!p) throw new Error("No active project")
+    
+    await councilPackService.generateSansForms(p.id, `SANS_Form_1_${p.erf || 'Project'}.pdf`)
+    toast.success('SANS Forms downloaded successfully')
+  } catch (e) {
+    console.error(e)
+    toast.error('SANS forms generation failed', { description: e.message })
+  } finally {
+    isExportingSans.value = false
+  }
+}
+
 function downloadCsv(filename, rows) {
   const bom = '\uFEFF'
   const csv =
@@ -380,7 +398,7 @@ function exportTallyCsv() {
           </div>
 
           <div v-else class="space-y-4">
-            <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-stretch">
               <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm flex flex-col gap-4">
                 <div class="flex items-start gap-3">
                   <div class="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0">
@@ -476,16 +494,37 @@ function exportTallyCsv() {
                   {{ isExportingXls ? 'Generating...' : 'Download Excel (.xlsx)' }}
                 </Button>
               </div>
-            </div>
 
-            <div class="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-              <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-                <h3 class="text-sm font-semibold text-slate-700">Quick Exports</h3>
-                <span class="text-[11px] text-slate-400">
-                  {{ hasAnyQuickExport ? 'CSV shortcuts enabled' : 'No schedule or tally data loaded yet' }}
-                </span>
+              <div class="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col">
+                <div class="p-5 flex flex-col flex-1 bg-slate-50/50">
+                  <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-sm font-semibold text-slate-700">Official SANS Forms</h3>
+                  </div>
+                  <p class="text-xs text-slate-500 mt-1 mb-4">Generates pre-filled SANS 10400 PDF declaration forms using project data, ready for signing.</p>
+                  
+                  <div class="mt-auto">
+                    <Button
+                      variant="default"
+                      class="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                      :disabled="isExportingSans"
+                      @click="handleExportSans"
+                    >
+                      <Loader2 v-if="isExportingSans" class="w-4 h-4 mr-2 animate-spin" />
+                      <FileText v-else class="w-4 h-4 mr-2" />
+                      {{ isExportingSans ? 'Generating...' : 'Download SANS Forms' }}
+                    </Button>
+                  </div>
+                </div>
               </div>
-              <div class="divide-y divide-slate-100">
+
+              <div class="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col h-full">
+                <div class="px-5 py-4 border-b border-slate-100 flex flex-col gap-1">
+                  <h3 class="text-sm font-semibold text-slate-700">Quick Exports</h3>
+                  <span class="text-[11px] text-slate-400">
+                    {{ hasAnyQuickExport ? 'CSV shortcuts enabled' : 'No schedule or tally data loaded yet' }}
+                  </span>
+                </div>
+                <div class="divide-y divide-slate-100 flex-1 overflow-y-auto">
                 <div class="flex items-center justify-between px-5 py-3 gap-4">
                   <div>
                     <p class="text-sm font-medium text-slate-700">Door schedule only</p>
@@ -519,6 +558,7 @@ function exportTallyCsv() {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </main>
   </div>
