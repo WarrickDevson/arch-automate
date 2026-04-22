@@ -34,6 +34,14 @@ var defaultConnection =
     ?? Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
     ?? Environment.GetEnvironmentVariable("DATABASE_URL");
 
+if (!string.IsNullOrWhiteSpace(defaultConnection) && (defaultConnection.StartsWith("postgres://") || defaultConnection.StartsWith("postgresql://")))
+{
+    var uri = new Uri(defaultConnection);
+    var userInfo = uri.UserInfo.Split(':');
+    var password = userInfo.Length > 1 ? userInfo[1] : "";
+    defaultConnection = $"Host={uri.Host};Port={(uri.Port > 0 ? uri.Port : 5432)};Database={uri.LocalPath.TrimStart('/')};Username={userInfo[0]};Password={password};SSL Mode=Require;Trust Server Certificate=true";
+}
+
 if (string.IsNullOrWhiteSpace(defaultConnection))
 {
     var pgHost = Environment.GetEnvironmentVariable("PGHOST");
