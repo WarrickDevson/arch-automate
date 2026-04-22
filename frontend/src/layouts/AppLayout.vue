@@ -174,10 +174,15 @@ const projectNavItems = computed(() => [
   },
 ])
 
-const navSections = computed(() => [
-  { label: 'Workspace', items: workspaceNavItems.value },
-  { label: 'Project Workspace', items: projectNavItems.value },
-])
+const navSections = computed(() => {
+  const sections = [
+    { label: 'Workspace', items: workspaceNavItems.value }
+  ]
+  if (hasActiveProject.value) {
+    sections.push({ label: 'Project Workspace', items: projectNavItems.value })
+  }
+  return sections
+})
 
 const sidebarLabelClass = computed(() =>
   uiStore.isSidebarCollapsed
@@ -290,47 +295,27 @@ onUnmounted(() => {
           </p>
 
           <div class="space-y-0.5">
-            <template v-for="item in section.items">
-              <RouterLink
-                v-if="!item.requiresProject || hasActiveProject"
-                :key="`enabled-${item.label}`"
-                :to="item.to"
-                class="group flex items-start rounded-lg px-3 py-2.5 text-xs font-bold uppercase tracking-widest transition-all mb-1"
-                :class="
-                  item.isActive()
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
-                    : 'text-slate-400 hover:bg-slate-900 hover:text-slate-100'
-                "
-              >
-                <component :is="item.icon" class="h-4 w-4 shrink-0" />
-                <span class="whitespace-nowrap transition-all duration-300" :class="sidebarLabelClass">
-                  <span class="block">{{ item.label }}</span>
-                  <span
-                    v-if="item.context && !uiStore.isSidebarCollapsed"
-                    class="block text-[9px] font-medium normal-case tracking-normal truncate max-w-[130px]"
-                    :class="item.isActive() ? 'text-blue-200' : 'text-slate-500'"
-                  >{{ item.context }}</span>
-                </span>
-              </RouterLink>
-
-              <button
-                v-else
-                :key="`disabled-${item.label}`"
-                type="button"
-                class="group flex w-full items-start rounded-lg border border-slate-800/80 bg-slate-900/40 px-3 py-2.5 text-xs font-bold uppercase tracking-widest text-slate-600/90"
-                title="Select or create a project first"
-                @click="onDisabledProjectNavClick"
-              >
-                <component :is="item.icon" class="h-4 w-4 shrink-0 mt-0.5" />
-                <span class="whitespace-nowrap transition-all duration-300" :class="sidebarLabelClass">
-                  <span class="block">{{ item.label }}</span>
-                  <span v-if="!uiStore.isSidebarCollapsed" class="mt-1 inline-flex items-center gap-1 text-[9px] font-medium normal-case tracking-normal text-slate-500">
-                    <Lock class="h-3 w-3" />
-                    Requires active project
-                  </span>
-                </span>
-              </button>
-            </template>
+            <RouterLink
+              v-for="item in section.items"
+              :key="item.label"
+              :to="item.to"
+              class="group flex items-start rounded-lg px-3 py-2.5 text-xs font-bold uppercase tracking-widest transition-all mb-1"
+              :class="
+                item.isActive()
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
+                  : 'text-slate-400 hover:bg-slate-900 hover:text-slate-100'
+              "
+            >
+              <component :is="item.icon" class="h-4 w-4 shrink-0" />
+              <span class="whitespace-nowrap transition-all duration-300" :class="sidebarLabelClass">
+                <span class="block">{{ item.label }}</span>
+                <span
+                  v-if="item.context && !uiStore.isSidebarCollapsed"
+                  class="block text-[9px] font-medium normal-case tracking-normal truncate max-w-[130px]"
+                  :class="item.isActive() ? 'text-blue-200' : 'text-slate-500'"
+                >{{ item.context }}</span>
+              </span>
+            </RouterLink>
           </div>
         </div>
       </nav>
