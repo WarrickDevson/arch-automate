@@ -163,31 +163,52 @@ watch(activeOverlay, (mode) => applyViewMode(mode))
 // Auto-restore: fires when (a) viewer finishes setup and ifcPath is already known,
 // or (b) ifcPath arrives after setup completes.
 // Using a computed source [ready, path] means it triggers on either change.
+let _isRestoring = false
+let _lastTriedPath = undefined
+
 watch(
   [_viewerReady, () => props.ifcPath],
   async ([ready, path]) => {
     if (!ready || _loadedModel) return
-    try {
+    
+    // Guard against concurrent executions that crash the WASM viewer
+    if (_isRestoring) return
+
+    const tryLoad = async (currentPath) => {
+      _isRestoring = true
+      _lastTriedPath = currentPath
       let buffer = null
-      if (path) {
-        // Prefer Supabase Storage (also checks local IndexedDB cache first inside downloadIfc)
-        buffer = await downloadIfc(props.projectId, path)
-      } else {
-        // No remote path yet — try local IndexedDB cache (file was loaded but not yet uploaded)
-        const { loadIfc } = await import('@/lib/ifcCache')
-        buffer = await loadIfc(props.projectId).catch(() => null)
+      
+      try {
+        if (currentPath) {
+          // Prefer Supabase Storage (also checks local IndexedDB cache first inside downloadIfc)
+          buffer = await downloadIfc(props.projectId, currentPath)
+        } else {
+          // No remote path yet — try local IndexedDB cache (file was loaded but not yet uploaded)
+          const { loadIfc } = await import('@/lib/ifcCache')
+          buffer = await loadIfc(props.projectId).catch(() => null)
+        }
+        
+        if (buffer && !_loadedModel) {
+          await loadIFC({
+            name: `cached_${props.projectId}.ifc`,
+            size: buffer.byteLength,
+            _fromCache: true,
+            async arrayBuffer() { return buffer },
+          })
+        }
+      } catch (e) {
+        console.warn('IFC auto-restore failed:', e)
+      } finally {
+        _isRestoring = false
+        // If the path changed while we were loading (e.g. from null to a real remote path), and we didn't load the model, retry
+        if (props.ifcPath !== _lastTriedPath && !_loadedModel) {
+          tryLoad(props.ifcPath)
+        }
       }
-      if (buffer && !_loadedModel) {
-        await loadIFC({
-          name: `cached_${props.projectId}.ifc`,
-          size: buffer.byteLength,
-          _fromCache: true,
-          async arrayBuffer() { return buffer },
-        })
-      }
-    } catch (e) {
-      console.warn('IFC auto-restore failed:', e)
     }
+
+    tryLoad(path)
   },
 )
 

@@ -134,6 +134,8 @@ watch(
     }
 
     isLoadingProject.value = true
+    clearCurrentIfcContext()
+    
     try {
       // Ensure municipality list is loaded so we can resolve province
       municipalitiesStore.fetchMunicipalities()
@@ -530,6 +532,7 @@ async function handleCouncilPack() {
             <!-- 3D Viewport -->
             <section class="min-h-[400px] relative rounded-xl border border-slate-200 bg-[#0f172a] overflow-hidden shadow-2xl">
               <Viewer3D
+                :key="projectId"
                 ref="viewer3DRef"
                 :project-id="projectId"
                 :tenant-id="authStore.profile?.tenant_id ?? null"
